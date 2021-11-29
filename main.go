@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go/service/elbv2"
 	log "github.com/cantara/bragi"
 	"github.com/joho/godotenv"
 )
@@ -30,8 +31,15 @@ var token string
 func main() {
 	log.Println("vim-go")
 	loadEnv()
-	serverName := "TestServer9"
+	serverName := "devtest-entraos-events"
 	region := "us-west-2"
+	port := aws.Int64()
+	elbListenerARN := ""
+	uriPath := "events"
+	vpc := ""
+
+	region = "eu-central-1"
+	vpc = ""
 
 	// Initialize a session in us-west-2 that the SDK will use to load
 	// credentials from the shared credentials file ~/.aws/credentials.
@@ -57,10 +65,10 @@ func main() {
 	fmt.Printf("Created key pair %q %s\n%s\n",
 		*keyResult.KeyName, *keyResult.KeyFingerprint,
 		*keyResult.KeyMaterial)
-	err = sendSlackMessage(fmt.Sprintf("%s.pem\n```%s```", pairName, *keyResult.KeyMaterial))
+	/*err = sendSlackMessage(fmt.Sprintf("%s.pem\n```%s```", pairName, *keyResult.KeyMaterial))
 	if err != nil {
 		log.Fatal(err)
-	}
+	}*/
 
 	// Get a list of VPCs so we can associate the group with the first VPC.
 	result, err := svc.DescribeVpcs(nil)
@@ -135,7 +143,7 @@ func main() {
 
 	// Specify the details of the instance that you want to create
 	runResult, err := svc.RunInstances(&ec2.RunInstancesInput{
-		ImageId:          aws.String("ami-0142f6ace1c558c7d"),
+		ImageId:          aws.String("ami-0bd99ef9eccfee250"), //ami-0142f6ace1c558c7d"),
 		InstanceType:     aws.String("t3.micro"),
 		MinCount:         aws.Int64(1),
 		MaxCount:         aws.Int64(1),
@@ -173,8 +181,7 @@ func main() {
 	})
 
 	if err != nil {
-		fmt.Println("Could not create instance", err)
-		return
+		log.Fatal("Could not create instance", err)
 	}
 
 	fmt.Println("Created instance", *runResult.Instances[0].InstanceId)
@@ -183,13 +190,13 @@ func main() {
 		GroupId: secGroupRes.GroupId,
 		IpPermissions: []*ec2.IpPermission{
 			{
-				FromPort:   aws.Int64(80),
+				FromPort:   port,
 				IpProtocol: aws.String("tcp"),
-				ToPort:     aws.Int64(80),
+				ToPort:     port,
 				UserIdGroupPairs: []*ec2.UserIdGroupPair{
 					{
 						Description: aws.String("HTTP access from other instances"),
-						GroupId:     aws.String("sg-1325864d"), //TODO: dynamically get loadbalancer sg
+						GroupId:     aws.String(""), //TODO: dynamically get loadbalancer sg
 					},
 				},
 			},
@@ -201,6 +208,17 @@ func main() {
 					{
 						CidrIp:      aws.String("0.0.0.0/0"),
 						Description: aws.String("SSH access from everywhere"),
+					},
+				},
+			},
+			{
+				FromPort:   aws.Int64(5701),
+				IpProtocol: aws.String("tcp"),
+				ToPort:     aws.Int64(5799),
+				UserIdGroupPairs: []*ec2.UserIdGroupPair{
+					{
+						Description: aws.String("Hazelcast access"),
+						GroupId:     secGroupRes.GroupId,
 					},
 				},
 			},
@@ -240,10 +258,209 @@ func main() {
 			// Message from an error.
 			log.Println(err.Error())
 		}
-		return
 	}
 
 	sendSlackMessage(fmt.Sprintf("`ssh -i ec2-user@%s %s.pem`", *describeInstances.Reservations[0].Instances[0].PublicDnsName, pairName))
+
+	svcELB := elbv2.New(sess)
+
+	createTargetGroupInput := &elbv2.CreateTargetGroupInput{
+		Name:                       aws.String(serverName + "-tg"),
+		Port:                       port,
+		Protocol:                   aws.String("HTTP"),
+		VpcId:                      aws.String(vpc),
+		TargetType:                 aws.String("instance"),
+		ProtocolVersion:            aws.String("HTTP1"),
+		HealthCheckIntervalSeconds: aws.Int64(5),
+		HealthCheckPath:            aws.String(fmt.Sprintf("/%s/health", uriPath)),
+		HealthCheckPort:            aws.String("traffic-port"),
+		HealthCheckProtocol:        aws.String("HTTP"),
+		HealthCheckTimeoutSeconds:  aws.Int64(2),
+		HealthyThresholdCount:      aws.Int64(2),
+	}
+
+	createTargetGroupResult, err := svcELB.CreateTargetGroup(createTargetGroupInput)
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			switch aerr.Code() {
+			case elbv2.ErrCodeDuplicateTargetGroupNameException:
+				fmt.Println(elbv2.ErrCodeDuplicateTargetGroupNameException, aerr.Error())
+			case elbv2.ErrCodeTooManyTargetGroupsException:
+				fmt.Println(elbv2.ErrCodeTooManyTargetGroupsException, aerr.Error())
+			case elbv2.ErrCodeInvalidConfigurationRequestException:
+				fmt.Println(elbv2.ErrCodeInvalidConfigurationRequestException, aerr.Error())
+			case elbv2.ErrCodeTooManyTagsException:
+				fmt.Println(elbv2.ErrCodeTooManyTagsException, aerr.Error())
+			default:
+				fmt.Println(aerr.Error())
+			}
+		} else {
+			// Print the error, cast err to awserr.Error to get the Code and
+			// Message from an error.
+			fmt.Println(err.Error())
+		}
+	}
+
+	describeInstancesInput = &ec2.DescribeInstancesInput{
+		InstanceIds: []*string{
+			runResult.Instances[0].InstanceId,
+		},
+	}
+
+	describeInstancesResult, err := svc.DescribeInstances(describeInstancesInput)
+
+	for err != nil || *describeInstancesResult.Reservations[0].Instances[0].State.Name != "running" {
+		if err != nil {
+			log.AddError(err).Warning("Getting running state of new instance")
+		}
+		describeInstancesResult, err = svc.DescribeInstances(describeInstancesInput)
+	}
+
+	registerTargetsInput := &elbv2.RegisterTargetsInput{
+		TargetGroupArn: createTargetGroupResult.TargetGroups[0].TargetGroupArn,
+		Targets: []*elbv2.TargetDescription{
+			{
+				Id: runResult.Instances[0].InstanceId,
+			},
+		},
+	}
+
+	_, err = svcELB.RegisterTargets(registerTargetsInput)
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			switch aerr.Code() {
+			case elbv2.ErrCodeTargetGroupNotFoundException:
+				fmt.Println(elbv2.ErrCodeTargetGroupNotFoundException, aerr.Error())
+			case elbv2.ErrCodeTooManyTargetsException:
+				fmt.Println(elbv2.ErrCodeTooManyTargetsException, aerr.Error())
+			case elbv2.ErrCodeInvalidTargetException:
+				fmt.Println(elbv2.ErrCodeInvalidTargetException, aerr.Error())
+			case elbv2.ErrCodeTooManyRegistrationsForTargetIdException:
+				fmt.Println(elbv2.ErrCodeTooManyRegistrationsForTargetIdException, aerr.Error())
+			default:
+				fmt.Println(aerr.Error())
+			}
+		} else {
+			// Print the error, cast err to awserr.Error to get the Code and
+			// Message from an error.
+			fmt.Println(err.Error())
+		}
+	}
+	/*
+		createLoadBalancerInput := &elbv2.CreateLoadBalancerInput{
+			Name: aws.String(serverName + "-lb"),
+			Subnets: []*string{
+				aws.String("subnet-8ea069d3"),
+				aws.String("subnet-29723302"),
+				aws.String("subnet-e5bd439d"),
+				aws.String("subnet-61d2ca2a"),
+			},
+		}
+
+		createLoadBalanceRresult, err := svcELB.CreateLoadBalancer(createLoadBalancerInput)
+		if err != nil {
+			if aerr, ok := err.(awserr.Error); ok {
+				switch aerr.Code() {
+				case elbv2.ErrCodeDuplicateLoadBalancerNameException:
+					fmt.Println(elbv2.ErrCodeDuplicateLoadBalancerNameException, aerr.Error())
+				case elbv2.ErrCodeTooManyLoadBalancersException:
+					fmt.Println(elbv2.ErrCodeTooManyLoadBalancersException, aerr.Error())
+				case elbv2.ErrCodeInvalidConfigurationRequestException:
+					fmt.Println(elbv2.ErrCodeInvalidConfigurationRequestException, aerr.Error())
+				case elbv2.ErrCodeSubnetNotFoundException:
+					fmt.Println(elbv2.ErrCodeSubnetNotFoundException, aerr.Error())
+				case elbv2.ErrCodeInvalidSubnetException:
+					fmt.Println(elbv2.ErrCodeInvalidSubnetException, aerr.Error())
+				case elbv2.ErrCodeInvalidSecurityGroupException:
+					fmt.Println(elbv2.ErrCodeInvalidSecurityGroupException, aerr.Error())
+				case elbv2.ErrCodeInvalidSchemeException:
+					fmt.Println(elbv2.ErrCodeInvalidSchemeException, aerr.Error())
+				case elbv2.ErrCodeTooManyTagsException:
+					fmt.Println(elbv2.ErrCodeTooManyTagsException, aerr.Error())
+				case elbv2.ErrCodeDuplicateTagKeysException:
+					fmt.Println(elbv2.ErrCodeDuplicateTagKeysException, aerr.Error())
+				case elbv2.ErrCodeResourceInUseException:
+					fmt.Println(elbv2.ErrCodeResourceInUseException, aerr.Error())
+				case elbv2.ErrCodeAllocationIdNotFoundException:
+					fmt.Println(elbv2.ErrCodeAllocationIdNotFoundException, aerr.Error())
+				case elbv2.ErrCodeAvailabilityZoneNotSupportedException:
+					fmt.Println(elbv2.ErrCodeAvailabilityZoneNotSupportedException, aerr.Error())
+				case elbv2.ErrCodeOperationNotPermittedException:
+					fmt.Println(elbv2.ErrCodeOperationNotPermittedException, aerr.Error())
+				default:
+					fmt.Println(aerr.Error())
+				}
+			} else {
+				// Print the error, cast err to awserr.Error to get the Code and
+				// Message from an error.
+				fmt.Println(err.Error())
+			}
+		}
+
+		elbARN = *createLoadBalanceRresult.LoadBalancers[0].LoadBalancerArn
+	*/
+	createRuleInput := &elbv2.CreateRuleInput{
+		Actions: []*elbv2.Action{
+			{
+				TargetGroupArn: createTargetGroupResult.TargetGroups[0].TargetGroupArn,
+				Type:           aws.String("forward"),
+			},
+		},
+		Conditions: []*elbv2.RuleCondition{
+			{
+				Field: aws.String("path-pattern"),
+				Values: []*string{
+					aws.String(fmt.Sprintf("/%s/*", uriPath)),
+				},
+			},
+		},
+		ListenerArn: aws.String(elbListenerARN),
+		Priority:    aws.Int64(1),
+	}
+
+	_, err = svcELB.CreateRule(createRuleInput)
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			switch aerr.Code() {
+			case elbv2.ErrCodePriorityInUseException:
+				fmt.Println(elbv2.ErrCodePriorityInUseException, aerr.Error())
+			case elbv2.ErrCodeTooManyTargetGroupsException:
+				fmt.Println(elbv2.ErrCodeTooManyTargetGroupsException, aerr.Error())
+			case elbv2.ErrCodeTooManyRulesException:
+				fmt.Println(elbv2.ErrCodeTooManyRulesException, aerr.Error())
+			case elbv2.ErrCodeTargetGroupAssociationLimitException:
+				fmt.Println(elbv2.ErrCodeTargetGroupAssociationLimitException, aerr.Error())
+			case elbv2.ErrCodeIncompatibleProtocolsException:
+				fmt.Println(elbv2.ErrCodeIncompatibleProtocolsException, aerr.Error())
+			case elbv2.ErrCodeListenerNotFoundException:
+				fmt.Println(elbv2.ErrCodeListenerNotFoundException, aerr.Error())
+			case elbv2.ErrCodeTargetGroupNotFoundException:
+				fmt.Println(elbv2.ErrCodeTargetGroupNotFoundException, aerr.Error())
+			case elbv2.ErrCodeInvalidConfigurationRequestException:
+				fmt.Println(elbv2.ErrCodeInvalidConfigurationRequestException, aerr.Error())
+			case elbv2.ErrCodeTooManyRegistrationsForTargetIdException:
+				fmt.Println(elbv2.ErrCodeTooManyRegistrationsForTargetIdException, aerr.Error())
+			case elbv2.ErrCodeTooManyTargetsException:
+				fmt.Println(elbv2.ErrCodeTooManyTargetsException, aerr.Error())
+			case elbv2.ErrCodeUnsupportedProtocolException:
+				fmt.Println(elbv2.ErrCodeUnsupportedProtocolException, aerr.Error())
+			case elbv2.ErrCodeTooManyActionsException:
+				fmt.Println(elbv2.ErrCodeTooManyActionsException, aerr.Error())
+			case elbv2.ErrCodeInvalidLoadBalancerActionException:
+				fmt.Println(elbv2.ErrCodeInvalidLoadBalancerActionException, aerr.Error())
+			case elbv2.ErrCodeTooManyUniqueTargetGroupsPerLoadBalancerException:
+				fmt.Println(elbv2.ErrCodeTooManyUniqueTargetGroupsPerLoadBalancerException, aerr.Error())
+			case elbv2.ErrCodeTooManyTagsException:
+				fmt.Println(elbv2.ErrCodeTooManyTagsException, aerr.Error())
+			default:
+				fmt.Println(aerr.Error())
+			}
+		} else {
+			// Print the error, cast err to awserr.Error to get the Code and
+			// Message from an error.
+			fmt.Println(err.Error())
+		}
+	}
 }
 
 type slackMessage struct {
