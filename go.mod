@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/aws/aws-sdk-go v1.42.15
-	github.com/cantara/bragi v0.4.1
+	github.com/cantara/bragi v0.4.2
 	github.com/joho/godotenv v1.4.0
 )
 

@@ -6,6 +6,8 @@ github.com/aws/aws-sdk-go v1.42.15 h1:RcUChuF7KzrrTqx9LAzJbLBX00LkUY7cH9T1VdxNdq
 github.com/aws/aws-sdk-go v1.42.15/go.mod h1:585smgzpB/KqRA+K3y/NL/oYRqQvpNJYvLm+LY1U59Q=
 github.com/cantara/bragi v0.4.1 h1:LuiMdV2IaImW/DmKK1bhVcTsolPEt458m834Vvz8jLA=
 github.com/cantara/bragi v0.4.1/go.mod h1:UG6GZBNRGKiMkl2EwlKMQ1tWj2l/9bcXSIzG1b/jVC8=
+github.com/cantara/bragi v0.4.2 h1:pXcb1XDE4ne7TCtlDi+p1USAqvIAufaLMYoJLgNzPKw=
+github.com/cantara/bragi v0.4.2/go.mod h1:UG6GZBNRGKiMkl2EwlKMQ1tWj2l/9bcXSIzG1b/jVC8=
 github.com/davecgh/go-spew v1.1.0 h1:ZDRjVQ15GmhC3fiQ8ni8+OwkZQO4DARzQgrnXU1Liz8=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/jmespath/go-jmespath v0.4.0 h1:BEgLn5cpjn8UN1mAw4NjwDrS35OdebyEtFe+9YPoQUg=
