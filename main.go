@@ -1,21 +1,17 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
-	"encoding/xml"
 	"fmt"
 	"io"
-	"net/http"
-	"net/url"
+	"io/ioutil"
 	"os"
+	"os/exec"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/aws/aws-sdk-go/service/elbv2"
 	log "github.com/cantara/bragi"
+	cloud "github.com/cantara/nerthus/aws"
 	"github.com/joho/godotenv"
 )
 
@@ -29,17 +25,25 @@ func loadEnv() {
 var token string
 
 func main() {
-	log.Println("vim-go")
 	loadEnv()
-	serverName := "devtest-entraos-events"
-	region := "us-west-2"
-	port := aws.Int64()
-	elbListenerARN := ""
-	uriPath := "events"
-	vpc := ""
-
-	region = "eu-central-1"
-	vpc = ""
+	region := "us-west-2" //"eu-central-1"
+	serverName := "devtest-entraos-notification3"
+	port := 18840
+	uriPath := "notifications"
+	elbListenerArn := "arn:aws:elasticloadbalancing:us-west-2:493376950721:listener/app/devtest-events2-lb/a3807cba101b280b/90abaa841820e9b2"
+	elbSecurityGroupId := "sg-1325864d"
+	shouldCleanUp := false
+	deleters := NewStack()
+	defer func() {
+		if !shouldCleanUp {
+			return
+		}
+		log.Info("Cleanup started.")
+		for delFunc := deleters.Pop(); delFunc != nil; delFunc = deleters.Pop() {
+			delFunc()
+		}
+		log.Info("Cleanup is \"done\", exiting.")
+	}()
 
 	// Initialize a session in us-west-2 that the SDK will use to load
 	// credentials from the shared credentials file ~/.aws/credentials.
@@ -47,551 +51,200 @@ func main() {
 		Region: aws.String(region)},
 	)
 
+	var c cloud.AWS
 	// Create an EC2 service client.
-	svc := ec2.New(sess)
+	c.NewEC2(sess)
 
-	pairName := serverName + "-key"
-	// Creates a new  key pair with the given name
-	keyResult, err := svc.CreateKeyPair(&ec2.CreateKeyPairInput{
-		KeyName: aws.String(pairName),
-	})
+	// Create a new key
+	keyName, keyFingerprint, keyMaterial, err := c.CreateKeyPair(serverName)
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok && aerr.Code() == "InvalidKeyPair.Duplicate" {
-			log.Fatalf("Keypair %q already exists.", pairName)
-		}
-		log.Fatalf("Unable to create key pair: %s, %v.", pairName, err)
+		shouldCleanUp = true
+		log.AddError(err).Fatal("While creating keypair")
 	}
-
-	fmt.Printf("Created key pair %q %s\n%s\n",
-		*keyResult.KeyName, *keyResult.KeyFingerprint,
-		*keyResult.KeyMaterial)
-	/*err = sendSlackMessage(fmt.Sprintf("%s.pem\n```%s```", pairName, *keyResult.KeyMaterial))
-	if err != nil {
-		log.Fatal(err)
-	}*/
+	deleters.Push(lateExecuteDeletersWithErrorLogging("Key pair", "while deleting created key pair",
+		c.DeleteKeyPair, keyName))
+	log.Printf("Created key pair %s %s\n%s\n",
+		keyName, keyFingerprint,
+		keyMaterial)
+	pemName := fmt.Sprintf("%s.pem", keyName)
+	pem, err := os.OpenFile("./"+pemName, os.O_WRONLY|os.O_CREATE, 0600)
+	if err == nil {
+		fmt.Fprint(pem, keyMaterial)
+		pem.Close()
+	}
+	defer os.Remove(pemName)
 
 	// Get a list of VPCs so we can associate the group with the first VPC.
-	result, err := svc.DescribeVpcs(nil)
+	vpcId, err := c.GetVPCId()
 	if err != nil {
-		log.Fatalf("Unable to describe VPCs, %v", err)
-	}
-	if len(result.Vpcs) == 0 {
-		log.Fatalf("No VPCs found to associate security group with.")
+		shouldCleanUp = true
+		log.AddError(err).Fatal("While getting vpcId")
 	}
 
-	secName := serverName + "-sg"
-	vpcID := aws.StringValue(result.Vpcs[0].VpcId)
-	secGroupRes, err := svc.CreateSecurityGroup(&ec2.CreateSecurityGroupInput{
-		GroupName:   aws.String(secName),
-		Description: aws.String("Security group for server: " + serverName),
-		VpcId:       aws.String(vpcID),
-	})
+	securityGroupId, err := c.CreateSecurityGroup(serverName, vpcId)
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			case "InvalidVpcID.NotFound":
-				log.Fatalf("Unable to find VPC with ID %q.", vpcID)
-			case "InvalidGroup.Duplicate":
-				log.Fatalf("Security group %q already exists.", secName)
-			}
-		}
-		log.Fatalf("Unable to create security group %q, %v", secName, err)
+		shouldCleanUp = true
+		log.AddError(err).Fatal("While creating security group")
+	}
+	deleters.Push(lateExecuteDeletersWithErrorLogging("Security group", "while deleting created security group",
+		c.DeleteSecurityGroup, securityGroupId))
+	log.Printf("Created security group %s with VPC %s.\n",
+		securityGroupId, vpcId)
+
+	err = c.AddBaseAuthorization(securityGroupId, elbSecurityGroupId, port)
+	if err != nil {
+		shouldCleanUp = true
+		log.AddError(err).Fatal("Could not add base authorization")
 	}
 
-	fmt.Printf("Created security group %s with VPC %s.\n",
-		aws.StringValue(secGroupRes.GroupId), vpcID)
-
-	// Add tags to the created instance
-	_, errtag := svc.CreateTags(&ec2.CreateTagsInput{
-		//Resources: []*string{runResult.Instances[0].InstanceId},
-		Resources: []*string{secGroupRes.GroupId},
-		Tags: []*ec2.Tag{
-			{
-				Key:   aws.String("Name"),
-				Value: aws.String(serverName),
-			},
-		},
-	})
-	if errtag != nil {
-		log.Println("Could not create tags for sg", secGroupRes.GroupId, errtag)
-		return
+	serverId, err := c.CreateServer(serverName, keyName, securityGroupId)
+	if err != nil {
+		shouldCleanUp = true
+		log.Fatal("Could not create server", err)
 	}
+	deleters.Push(lateExecuteDeletersWithErrorLogging("Server", "while deleting created server",
+		c.DeleteServer, serverId))
+	log.Info("Created server", serverId)
 
-	fmt.Println("Successfully tagged sg")
-
-	/*
-		input := &ec2.CreateVolumeInput{
-			AvailabilityZone: aws.String(region + "a"),
-			Size:             aws.Int64(20),
-			VolumeType:       aws.String("gp3"),
-		}
-
-		result, err := svc.CreateVolume(input)
+	if false { // Enable hazelcast
+		err = c.AuthorizeHazelcast(securityGroupId)
 		if err != nil {
-			if aerr, ok := err.(awserr.Error); ok {
-				switch aerr.Code() {
-				default:
-					log.Fatal(aerr.Error())
-				}
-			} else {
-				// Print the error, cast err to awserr.Error to get the Code and
-				// Message from an error.
-				log.Fatal(err.Error())
-			}
-		}
-	*/
-
-	// Specify the details of the instance that you want to create
-	runResult, err := svc.RunInstances(&ec2.RunInstancesInput{
-		ImageId:          aws.String("ami-0bd99ef9eccfee250"), //ami-0142f6ace1c558c7d"),
-		InstanceType:     aws.String("t3.micro"),
-		MinCount:         aws.Int64(1),
-		MaxCount:         aws.Int64(1),
-		SecurityGroupIds: aws.StringSlice([]string{*secGroupRes.GroupId}),
-		KeyName:          aws.String(pairName),
-		BlockDeviceMappings: []*ec2.BlockDeviceMapping{
-			{
-				DeviceName: aws.String("/dev/xvda"),
-				Ebs: &ec2.EbsBlockDevice{
-					VolumeSize: aws.Int64(20),
-					VolumeType: aws.String("gp3"),
-				},
-			},
-		},
-		TagSpecifications: []*ec2.TagSpecification{
-			{
-				ResourceType: aws.String("instance"),
-				Tags: []*ec2.Tag{
-					{
-						Key:   aws.String("Name"),
-						Value: aws.String(serverName),
-					},
-				},
-			},
-			{
-				ResourceType: aws.String("volume"),
-				Tags: []*ec2.Tag{
-					{
-						Key:   aws.String("Name"),
-						Value: aws.String(serverName), // + "-vol"),
-					},
-				},
-			},
-		},
-	})
-
-	if err != nil {
-		log.Fatal("Could not create instance", err)
-	}
-
-	fmt.Println("Created instance", *runResult.Instances[0].InstanceId)
-
-	input := &ec2.AuthorizeSecurityGroupIngressInput{
-		GroupId: secGroupRes.GroupId,
-		IpPermissions: []*ec2.IpPermission{
-			{
-				FromPort:   port,
-				IpProtocol: aws.String("tcp"),
-				ToPort:     port,
-				UserIdGroupPairs: []*ec2.UserIdGroupPair{
-					{
-						Description: aws.String("HTTP access from other instances"),
-						GroupId:     aws.String(""), //TODO: dynamically get loadbalancer sg
-					},
-				},
-			},
-			{
-				FromPort:   aws.Int64(22),
-				IpProtocol: aws.String("tcp"),
-				ToPort:     aws.Int64(22),
-				IpRanges: []*ec2.IpRange{
-					{
-						CidrIp:      aws.String("0.0.0.0/0"),
-						Description: aws.String("SSH access from everywhere"),
-					},
-				},
-			},
-			{
-				FromPort:   aws.Int64(5701),
-				IpProtocol: aws.String("tcp"),
-				ToPort:     aws.Int64(5799),
-				UserIdGroupPairs: []*ec2.UserIdGroupPair{
-					{
-						Description: aws.String("Hazelcast access"),
-						GroupId:     secGroupRes.GroupId,
-					},
-				},
-			},
-		},
-	}
-
-	_, err = svc.AuthorizeSecurityGroupIngress(input)
-	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			default:
-				log.Println(aerr.Error())
-			}
-		} else {
-			// Print the error, cast err to awserr.Error to get the Code and
-			// Message from an error.
-			log.Println(err.Error())
+			shouldCleanUp = true
+			log.AddError(err).Fatal("Could not add hazelcast authorization")
 		}
 	}
 
-	log.Debug(runResult)
-	describeInstancesInput := &ec2.DescribeInstancesInput{
-		InstanceIds: []*string{
-			runResult.Instances[0].InstanceId,
-		},
-	}
-
-	describeInstances, err := svc.DescribeInstances(describeInstancesInput)
+	err = c.WaitForRunning(serverId)
+	publicDns, err := c.GetPublicDNS(serverId)
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			default:
-				log.Println(aerr.Error())
-			}
-		} else {
-			// Print the error, cast err to awserr.Error to get the Code and
-			// Message from an error.
-			log.Println(err.Error())
-		}
+		shouldCleanUp = true
+		log.AddError(err).Fatal("While getting public dns name")
 	}
 
-	sendSlackMessage(fmt.Sprintf("`ssh -i ec2-user@%s %s.pem`", *describeInstances.Reservations[0].Instances[0].PublicDnsName, pairName))
+	c.NewELB(sess)
 
-	svcELB := elbv2.New(sess)
-
-	createTargetGroupInput := &elbv2.CreateTargetGroupInput{
-		Name:                       aws.String(serverName + "-tg"),
-		Port:                       port,
-		Protocol:                   aws.String("HTTP"),
-		VpcId:                      aws.String(vpc),
-		TargetType:                 aws.String("instance"),
-		ProtocolVersion:            aws.String("HTTP1"),
-		HealthCheckIntervalSeconds: aws.Int64(5),
-		HealthCheckPath:            aws.String(fmt.Sprintf("/%s/health", uriPath)),
-		HealthCheckPort:            aws.String("traffic-port"),
-		HealthCheckProtocol:        aws.String("HTTP"),
-		HealthCheckTimeoutSeconds:  aws.Int64(2),
-		HealthyThresholdCount:      aws.Int64(2),
-	}
-
-	createTargetGroupResult, err := svcELB.CreateTargetGroup(createTargetGroupInput)
+	targetGroupArn, err := c.CreateTargetGroup(serverName, vpcId, uriPath, port)
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			case elbv2.ErrCodeDuplicateTargetGroupNameException:
-				fmt.Println(elbv2.ErrCodeDuplicateTargetGroupNameException, aerr.Error())
-			case elbv2.ErrCodeTooManyTargetGroupsException:
-				fmt.Println(elbv2.ErrCodeTooManyTargetGroupsException, aerr.Error())
-			case elbv2.ErrCodeInvalidConfigurationRequestException:
-				fmt.Println(elbv2.ErrCodeInvalidConfigurationRequestException, aerr.Error())
-			case elbv2.ErrCodeTooManyTagsException:
-				fmt.Println(elbv2.ErrCodeTooManyTagsException, aerr.Error())
-			default:
-				fmt.Println(aerr.Error())
-			}
-		} else {
-			// Print the error, cast err to awserr.Error to get the Code and
-			// Message from an error.
-			fmt.Println(err.Error())
-		}
+		shouldCleanUp = true
+		log.AddError(err).Fatal(fmt.Sprintf("While creating target group for %s", serverName))
+	}
+	deleters.Push(lateExecuteDeletersWithErrorLogging("Target group", "while deleting created target group",
+		c.DeleteTargetGroup, targetGroupArn))
+
+	err = c.RegisterTarget(targetGroupArn, serverId)
+	if err != nil {
+		shouldCleanUp = true
+		log.AddError(err).Fatal(fmt.Sprintf("While adding target to target group %s", targetGroupArn))
+	}
+	deleters.Push(lateExecuteDeletersWithErrorLogging("Target in targetgroup", "while removing registered targetgroup",
+		c.RemoveTargetGroupTarget, targetGroupArn, serverId))
+
+	ruleArn, err := c.AddRuleToLoadBalancer(targetGroupArn, elbListenerArn, uriPath)
+	if err != nil {
+		shouldCleanUp = true
+		log.AddError(err).Fatal(fmt.Sprintf("While adding rule to elb %s", elbListenerArn))
+	}
+	deleters.Push(lateExecuteDeletersWithErrorLogging("Rule", "while removing rule added to loadbalancer",
+		c.DeleteRule, ruleArn))
+
+	log.Info("Done creating")
+
+	time.Sleep(30 * time.Second)
+	script, err := ioutil.ReadFile("./new_devtest_server.sh")
+	if err != nil {
+		log.AddError(err).Fatal("While reading in base script")
+	}
+	cmd := exec.Command("ssh", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no",
+		fmt.Sprintf("ec2-user@%s", publicDns), "-i", "./"+pemName, "/bin/bash -s")
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		log.AddError(err).Fatal("While creating stdin pipe")
+	}
+	defer stdin.Close()
+	io.WriteString(stdin, string(script))
+
+	err = cmd.Run()
+	if err != nil {
+		shouldCleanUp = true
+		log.AddError(err).Fatal("While running ssh settup command")
 	}
 
-	describeInstancesInput = &ec2.DescribeInstancesInput{
-		InstanceIds: []*string{
-			runResult.Instances[0].InstanceId,
-		},
+	script, err = ioutil.ReadFile("./new_devtest_server.sh")
+	if err != nil {
+		log.AddError(err).Fatal("While reading in filebeat script")
+	}
+	cmd = exec.Command("ssh", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no",
+		fmt.Sprintf("ec2-user@%s", publicDns), "-i", "./"+pemName, "/bin/bash -s")
+	stdin, err = cmd.StdinPipe()
+	if err != nil {
+		log.AddError(err).Fatal("While creating stdin pipe")
+	}
+	defer stdin.Close()
+	io.WriteString(stdin, string(script))
+
+	err = cmd.Run()
+	if err != nil {
+		shouldCleanUp = true
+		log.AddError(err).Fatal("While running ssh filebeat settup")
 	}
 
-	describeInstancesResult, err := svc.DescribeInstances(describeInstancesInput)
+	err = sendSlackMessage(fmt.Sprintf("`ssh ec2-user@%s -i %s`\n%[2]s\n```%s```", publicDns, pemName, keyMaterial))
+	if err != nil {
+		shouldCleanUp = true
+		log.Fatal(err)
+	}
 
-	for err != nil || *describeInstancesResult.Reservations[0].Instances[0].State.Name != "running" {
+}
+
+func lateExecuteDeletersWithErrorLogging(object, logMessage string, f func(...string) error, values ...string) func() {
+	return func() {
+		log.Info("Cleaning up: ", object)
+		err := f(values...)
 		if err != nil {
-			log.AddError(err).Warning("Getting running state of new instance")
-		}
-		describeInstancesResult, err = svc.DescribeInstances(describeInstancesInput)
-	}
-
-	registerTargetsInput := &elbv2.RegisterTargetsInput{
-		TargetGroupArn: createTargetGroupResult.TargetGroups[0].TargetGroupArn,
-		Targets: []*elbv2.TargetDescription{
-			{
-				Id: runResult.Instances[0].InstanceId,
-			},
-		},
-	}
-
-	_, err = svcELB.RegisterTargets(registerTargetsInput)
-	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			case elbv2.ErrCodeTargetGroupNotFoundException:
-				fmt.Println(elbv2.ErrCodeTargetGroupNotFoundException, aerr.Error())
-			case elbv2.ErrCodeTooManyTargetsException:
-				fmt.Println(elbv2.ErrCodeTooManyTargetsException, aerr.Error())
-			case elbv2.ErrCodeInvalidTargetException:
-				fmt.Println(elbv2.ErrCodeInvalidTargetException, aerr.Error())
-			case elbv2.ErrCodeTooManyRegistrationsForTargetIdException:
-				fmt.Println(elbv2.ErrCodeTooManyRegistrationsForTargetIdException, aerr.Error())
-			default:
-				fmt.Println(aerr.Error())
-			}
-		} else {
-			// Print the error, cast err to awserr.Error to get the Code and
-			// Message from an error.
-			fmt.Println(err.Error())
-		}
-	}
-	/*
-		createLoadBalancerInput := &elbv2.CreateLoadBalancerInput{
-			Name: aws.String(serverName + "-lb"),
-			Subnets: []*string{
-				aws.String("subnet-8ea069d3"),
-				aws.String("subnet-29723302"),
-				aws.String("subnet-e5bd439d"),
-				aws.String("subnet-61d2ca2a"),
-			},
-		}
-
-		createLoadBalanceRresult, err := svcELB.CreateLoadBalancer(createLoadBalancerInput)
-		if err != nil {
-			if aerr, ok := err.(awserr.Error); ok {
-				switch aerr.Code() {
-				case elbv2.ErrCodeDuplicateLoadBalancerNameException:
-					fmt.Println(elbv2.ErrCodeDuplicateLoadBalancerNameException, aerr.Error())
-				case elbv2.ErrCodeTooManyLoadBalancersException:
-					fmt.Println(elbv2.ErrCodeTooManyLoadBalancersException, aerr.Error())
-				case elbv2.ErrCodeInvalidConfigurationRequestException:
-					fmt.Println(elbv2.ErrCodeInvalidConfigurationRequestException, aerr.Error())
-				case elbv2.ErrCodeSubnetNotFoundException:
-					fmt.Println(elbv2.ErrCodeSubnetNotFoundException, aerr.Error())
-				case elbv2.ErrCodeInvalidSubnetException:
-					fmt.Println(elbv2.ErrCodeInvalidSubnetException, aerr.Error())
-				case elbv2.ErrCodeInvalidSecurityGroupException:
-					fmt.Println(elbv2.ErrCodeInvalidSecurityGroupException, aerr.Error())
-				case elbv2.ErrCodeInvalidSchemeException:
-					fmt.Println(elbv2.ErrCodeInvalidSchemeException, aerr.Error())
-				case elbv2.ErrCodeTooManyTagsException:
-					fmt.Println(elbv2.ErrCodeTooManyTagsException, aerr.Error())
-				case elbv2.ErrCodeDuplicateTagKeysException:
-					fmt.Println(elbv2.ErrCodeDuplicateTagKeysException, aerr.Error())
-				case elbv2.ErrCodeResourceInUseException:
-					fmt.Println(elbv2.ErrCodeResourceInUseException, aerr.Error())
-				case elbv2.ErrCodeAllocationIdNotFoundException:
-					fmt.Println(elbv2.ErrCodeAllocationIdNotFoundException, aerr.Error())
-				case elbv2.ErrCodeAvailabilityZoneNotSupportedException:
-					fmt.Println(elbv2.ErrCodeAvailabilityZoneNotSupportedException, aerr.Error())
-				case elbv2.ErrCodeOperationNotPermittedException:
-					fmt.Println(elbv2.ErrCodeOperationNotPermittedException, aerr.Error())
-				default:
-					fmt.Println(aerr.Error())
-				}
-			} else {
-				// Print the error, cast err to awserr.Error to get the Code and
-				// Message from an error.
-				fmt.Println(err.Error())
-			}
-		}
-
-		elbARN = *createLoadBalanceRresult.LoadBalancers[0].LoadBalancerArn
-	*/
-	createRuleInput := &elbv2.CreateRuleInput{
-		Actions: []*elbv2.Action{
-			{
-				TargetGroupArn: createTargetGroupResult.TargetGroups[0].TargetGroupArn,
-				Type:           aws.String("forward"),
-			},
-		},
-		Conditions: []*elbv2.RuleCondition{
-			{
-				Field: aws.String("path-pattern"),
-				Values: []*string{
-					aws.String(fmt.Sprintf("/%s/*", uriPath)),
-				},
-			},
-		},
-		ListenerArn: aws.String(elbListenerARN),
-		Priority:    aws.Int64(1),
-	}
-
-	_, err = svcELB.CreateRule(createRuleInput)
-	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			case elbv2.ErrCodePriorityInUseException:
-				fmt.Println(elbv2.ErrCodePriorityInUseException, aerr.Error())
-			case elbv2.ErrCodeTooManyTargetGroupsException:
-				fmt.Println(elbv2.ErrCodeTooManyTargetGroupsException, aerr.Error())
-			case elbv2.ErrCodeTooManyRulesException:
-				fmt.Println(elbv2.ErrCodeTooManyRulesException, aerr.Error())
-			case elbv2.ErrCodeTargetGroupAssociationLimitException:
-				fmt.Println(elbv2.ErrCodeTargetGroupAssociationLimitException, aerr.Error())
-			case elbv2.ErrCodeIncompatibleProtocolsException:
-				fmt.Println(elbv2.ErrCodeIncompatibleProtocolsException, aerr.Error())
-			case elbv2.ErrCodeListenerNotFoundException:
-				fmt.Println(elbv2.ErrCodeListenerNotFoundException, aerr.Error())
-			case elbv2.ErrCodeTargetGroupNotFoundException:
-				fmt.Println(elbv2.ErrCodeTargetGroupNotFoundException, aerr.Error())
-			case elbv2.ErrCodeInvalidConfigurationRequestException:
-				fmt.Println(elbv2.ErrCodeInvalidConfigurationRequestException, aerr.Error())
-			case elbv2.ErrCodeTooManyRegistrationsForTargetIdException:
-				fmt.Println(elbv2.ErrCodeTooManyRegistrationsForTargetIdException, aerr.Error())
-			case elbv2.ErrCodeTooManyTargetsException:
-				fmt.Println(elbv2.ErrCodeTooManyTargetsException, aerr.Error())
-			case elbv2.ErrCodeUnsupportedProtocolException:
-				fmt.Println(elbv2.ErrCodeUnsupportedProtocolException, aerr.Error())
-			case elbv2.ErrCodeTooManyActionsException:
-				fmt.Println(elbv2.ErrCodeTooManyActionsException, aerr.Error())
-			case elbv2.ErrCodeInvalidLoadBalancerActionException:
-				fmt.Println(elbv2.ErrCodeInvalidLoadBalancerActionException, aerr.Error())
-			case elbv2.ErrCodeTooManyUniqueTargetGroupsPerLoadBalancerException:
-				fmt.Println(elbv2.ErrCodeTooManyUniqueTargetGroupsPerLoadBalancerException, aerr.Error())
-			case elbv2.ErrCodeTooManyTagsException:
-				fmt.Println(elbv2.ErrCodeTooManyTagsException, aerr.Error())
-			default:
-				fmt.Println(aerr.Error())
-			}
-		} else {
-			// Print the error, cast err to awserr.Error to get the Code and
-			// Message from an error.
-			fmt.Println(err.Error())
+			log.AddError(err).Crit(logMessage)
 		}
 	}
 }
 
-type slackMessage struct {
-	SlackId string `json:"recepientId"`
-	Message string `json:"message"`
-	//	Username    string   `json:"username"`
-	Pinned bool `json:"pinned"`
-	//	Attachments []string `json:"attachments"`
+func NewStack() Stack {
+	return Stack{}
 }
 
-func sendSlackMessage(message string) (err error) {
-	if token == "" {
-		token, err = getWhydahAuthToken()
-		for count := 0; err != nil && count < 10; count++ {
-			token, err = getWhydahAuthToken()
-		}
-	}
-	return postAuth(os.Getenv("entraos_api_uri")+"/slack/api/message", slackMessage{
-		SlackId: os.Getenv("slack_channel"),
-		Message: message,
-		Pinned:  false,
-	}, nil, token)
+type Stack struct {
+	funcs []func()
 }
 
-type applicationcredential struct {
-	Params applicationCredentialParams `xml:"params"`
+func (s *Stack) Push(fun func()) {
+	s.funcs = append(s.funcs, fun)
 }
 
-type applicationCredentialParams struct {
-	AppId     string `xml:"applicationID"`
-	AppName   string `xml:"applicationName"`
-	AppSecret string `xml:"applicationSecret"`
+func (s *Stack) Pop() func() {
+	if s.Empty() {
+		return nil
+	}
+	fun := s.Last()
+	s.funcs = s.funcs[:s.Len()-1]
+	return fun
 }
 
-type applicationtoken struct {
-	Params applicationTokenParams `xml:"params"`
+func (s Stack) Len() int {
+	return len(s.funcs)
 }
 
-type applicationTokenParams struct {
-	AppTokenId string `xml:"applicationtokenID"`
-	AppId      string `xml:"applicationid"`
-	AppName    string `xml:"applicationName"`
-	expires    int    `xml:"expires"`
+func (s Stack) Last() func() {
+	if s.Empty() {
+		return nil
+	}
+	return s.funcs[s.Len()-1]
 }
 
-func getWhydahAuthToken() (token string, err error) {
-	appCred := applicationcredential{
-		Params: applicationCredentialParams{
-			AppId:     os.Getenv("whydah_application_id"),
-			AppName:   os.Getenv("whydah_application_name"),
-			AppSecret: os.Getenv("whydah_application_secret"),
-		},
+func (s Stack) First() func() {
+	if s.Empty() {
+		return nil
 	}
-	appCredXML, err := xml.Marshal(appCred)
-	if err != nil {
-		return
-	}
-	data := url.Values{
-		"applicationcredential": {string(appCredXML)},
-	}
-	log.Println(data)
-	resp, err := http.PostForm(os.Getenv("whydah_uri")+"/tokenservice/logon", data)
-	if err != nil {
-		return
-	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return
-	}
-	var tokenData applicationtoken
-	err = xml.Unmarshal(body, &tokenData)
-	if err != nil {
-		return
-	}
-	token = tokenData.Params.AppTokenId
-	return
+	return s.funcs[0]
 }
 
-func postAuth(uri string, data interface{}, out interface{}, token string) (err error) {
-	log.Info(token)
-	jsonValue, _ := json.Marshal(data)
-	client := &http.Client{}
-	req, err := http.NewRequest("POST", uri, bytes.NewBuffer(jsonValue))
-	req.Header.Set("Content-Type", "application/json")
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-	resp, err := client.Do(req)
-	log.Info(resp.StatusCode)
-	if err != nil || out == nil {
-		return
-	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return
-	}
-	err = json.Unmarshal(body, out)
-	return
+func (s Stack) Empty() bool {
+	return s.Len() == 0
 }
-
-/*
-func AddUser() models.Resp {
-	res := new(models.User)
-	var jsonData = []byte(`{"first_name":"` + res.Fname + `", "last_name":"` + res.Lname + `"}`)
-	client := &http.Client{}
-	req, err := http.NewRequest("POST", os.Env(""), bytes.NewBuffer(jsonData))
-	req.Header.Set("Content-Type", "application/json")
-	resp, er := client.Do(req)
-	fmt.Println(resp.Body)
-
-	if er != nil {
-		log.Info("Error in reqeust send")
-	}
-
-	if err != nil {
-		log.Info("Error in reqeust create")
-	}
-	defer resp.Body.Close()
-
-	fmt.Println(resp.StatusCode)
-	if resp.StatusCode == 200 {
-		log.Info("Successfully! Added User")
-
-	}
-	var data models.Resp
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		fmt.Println(err)
-	}
-
-	return data
-}
-*/
