@@ -1,4 +1,4 @@
-package main
+package whydah
 
 import (
 	"bytes"
@@ -8,30 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	//log "github.com/cantara/bragi"
 )
-
-type slackMessage struct {
-	SlackId string `json:"recepientId"`
-	Message string `json:"message"`
-	//	Username    string   `json:"username"`
-	Pinned bool `json:"pinned"`
-	//	Attachments []string `json:"attachments"`
-}
-
-func sendSlackMessage(message string) (err error) {
-	if token == "" {
-		token, err = getWhydahAuthToken()
-		for count := 0; err != nil && count < 10; count++ {
-			token, err = getWhydahAuthToken()
-		}
-	}
-	return postAuth(os.Getenv("entraos_api_uri")+"/slack/api/message", slackMessage{
-		SlackId: os.Getenv("slack_channel"),
-		Message: message,
-		Pinned:  false,
-	}, nil, token)
-}
 
 type applicationcredential struct {
 	Params applicationCredentialParams `xml:"params"`
@@ -87,7 +64,15 @@ func getWhydahAuthToken() (token string, err error) {
 	return
 }
 
-func postAuth(uri string, data interface{}, out interface{}, token string) (err error) {
+var token string
+
+func PostAuth(uri string, data interface{}, out interface{}) (err error) {
+	if token == "" {
+		token, err = getWhydahAuthToken()
+		for count := 0; err != nil && count < 10; count++ {
+			token, err = getWhydahAuthToken()
+		}
+	}
 	jsonValue, _ := json.Marshal(data)
 	client := &http.Client{}
 	req, err := http.NewRequest("POST", uri, bytes.NewBuffer(jsonValue))

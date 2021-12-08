@@ -2,16 +2,17 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"io/ioutil"
-	"os"
-	"os/exec"
-	"time"
+	"net/http"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	log "github.com/cantara/bragi"
 	cloud "github.com/cantara/nerthus/aws"
+	"github.com/cantara/nerthus/crypto"
+	"github.com/cantara/nerthus/slack"
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 )
 
@@ -22,187 +23,160 @@ func loadEnv() {
 	}
 }
 
-var token string
-
 func main() {
 	loadEnv()
-	region := "us-west-2" //"eu-central-1"
-	serverName := "devtest-entraos-notification3"
-	port := 18840
-	uriPath := "notifications"
-	elbListenerArn := "arn:aws:elasticloadbalancing:us-west-2:493376950721:listener/app/devtest-events2-lb/a3807cba101b280b/90abaa841820e9b2"
-	elbSecurityGroupId := "sg-1325864d"
-	shouldCleanUp := false
-	deleters := NewStack()
-	defer func() {
-		if !shouldCleanUp {
-			return
-		}
-		log.Info("Cleanup started.")
-		for delFunc := deleters.Pop(); delFunc != nil; delFunc = deleters.Pop() {
-			delFunc()
-		}
-		log.Info("Cleanup is \"done\", exiting.")
-	}()
+	crypto.InitCrypto()
 
+	region := "us-west-2" //"eu-central-1"
 	// Initialize a session in us-west-2 that the SDK will use to load
 	// credentials from the shared credentials file ~/.aws/credentials.
 	sess, err := session.NewSession(&aws.Config{
 		Region: aws.String(region)},
 	)
+	if err != nil {
+		log.AddError(err).Fatal("While creating aws session")
+	}
 
 	var c cloud.AWS
 	// Create an EC2 service client.
 	c.NewEC2(sess)
-
-	// Create a new key
-	keyName, keyFingerprint, keyMaterial, err := c.CreateKeyPair(serverName)
-	if err != nil {
-		shouldCleanUp = true
-		log.AddError(err).Fatal("While creating keypair")
-	}
-	deleters.Push(lateExecuteDeletersWithErrorLogging("Key pair", "while deleting created key pair",
-		c.DeleteKeyPair, keyName))
-	log.Printf("Created key pair %s %s\n%s\n",
-		keyName, keyFingerprint,
-		keyMaterial)
-	pemName := fmt.Sprintf("%s.pem", keyName)
-	pem, err := os.OpenFile("./"+pemName, os.O_WRONLY|os.O_CREATE, 0600)
-	if err == nil {
-		fmt.Fprint(pem, keyMaterial)
-		pem.Close()
-	}
-	defer os.Remove(pemName)
-
-	// Get a list of VPCs so we can associate the group with the first VPC.
-	vpcId, err := c.GetVPCId()
-	if err != nil {
-		shouldCleanUp = true
-		log.AddError(err).Fatal("While getting vpcId")
-	}
-
-	securityGroupId, err := c.CreateSecurityGroup(serverName, vpcId)
-	if err != nil {
-		shouldCleanUp = true
-		log.AddError(err).Fatal("While creating security group")
-	}
-	deleters.Push(lateExecuteDeletersWithErrorLogging("Security group", "while deleting created security group",
-		c.DeleteSecurityGroup, securityGroupId))
-	log.Printf("Created security group %s with VPC %s.\n",
-		securityGroupId, vpcId)
-
-	err = c.AddBaseAuthorization(securityGroupId, elbSecurityGroupId, port)
-	if err != nil {
-		shouldCleanUp = true
-		log.AddError(err).Fatal("Could not add base authorization")
-	}
-
-	serverId, err := c.CreateServer(serverName, keyName, securityGroupId)
-	if err != nil {
-		shouldCleanUp = true
-		log.Fatal("Could not create server", err)
-	}
-	deleters.Push(lateExecuteDeletersWithErrorLogging("Server", "while deleting created server",
-		c.DeleteServer, serverId))
-	log.Info("Created server", serverId)
-
-	if false { // Enable hazelcast
-		err = c.AuthorizeHazelcast(securityGroupId)
-		if err != nil {
-			shouldCleanUp = true
-			log.AddError(err).Fatal("Could not add hazelcast authorization")
-		}
-	}
-
-	err = c.WaitForRunning(serverId)
-	publicDns, err := c.GetPublicDNS(serverId)
-	if err != nil {
-		shouldCleanUp = true
-		log.AddError(err).Fatal("While getting public dns name")
-	}
-
+	// Create an ELBv2 service client.
 	c.NewELB(sess)
 
-	targetGroupArn, err := c.CreateTargetGroup(serverName, vpcId, uriPath, port)
-	if err != nil {
-		shouldCleanUp = true
-		log.AddError(err).Fatal(fmt.Sprintf("While creating target group for %s", serverName))
-	}
-	deleters.Push(lateExecuteDeletersWithErrorLogging("Target group", "while deleting created target group",
-		c.DeleteTargetGroup, targetGroupArn))
+	r := gin.Default()
+	config := cors.DefaultConfig()
+	config.AllowOrigins = []string{"*"}
+	r.Use(cors.New(config))
+	base := r.Group("/nerthus")
 
-	err = c.RegisterTarget(targetGroupArn, serverId)
-	if err != nil {
-		shouldCleanUp = true
-		log.AddError(err).Fatal(fmt.Sprintf("While adding target to target group %s", targetGroupArn))
-	}
-	deleters.Push(lateExecuteDeletersWithErrorLogging("Target in targetgroup", "while removing registered targetgroup",
-		c.RemoveTargetGroupTarget, targetGroupArn, serverId))
-
-	ruleArn, err := c.AddRuleToLoadBalancer(targetGroupArn, elbListenerArn, uriPath)
-	if err != nil {
-		shouldCleanUp = true
-		log.AddError(err).Fatal(fmt.Sprintf("While adding rule to elb %s", elbListenerArn))
-	}
-	deleters.Push(lateExecuteDeletersWithErrorLogging("Rule", "while removing rule added to loadbalancer",
-		c.DeleteRule, ruleArn))
-
-	log.Info("Done creating")
-
-	time.Sleep(30 * time.Second)
-	script, err := ioutil.ReadFile("./new_devtest_server.sh")
-	if err != nil {
-		log.AddError(err).Fatal("While reading in base script")
-	}
-	cmd := exec.Command("ssh", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no",
-		fmt.Sprintf("ec2-user@%s", publicDns), "-i", "./"+pemName, "/bin/bash -s")
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		log.AddError(err).Fatal("While creating stdin pipe")
-	}
-	defer stdin.Close()
-	io.WriteString(stdin, string(script))
-
-	err = cmd.Run()
-	if err != nil {
-		shouldCleanUp = true
-		log.AddError(err).Fatal("While running ssh settup command")
+	dash := base.Group("/dash")
+	{
+		dash.StaticFile("/", "./frontend/public/index.html")
+		dash.StaticFile("/global.css", "./frontend/public/global.css")
+		dash.StaticFile("/favicon.png", "./frontend/public/favicon.png")
+		dash.StaticFS("/build", http.Dir("./frontend/public/build"))
 	}
 
-	script, err = ioutil.ReadFile("./new_devtest_server.sh")
-	if err != nil {
-		log.AddError(err).Fatal("While reading in filebeat script")
-	}
-	cmd = exec.Command("ssh", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no",
-		fmt.Sprintf("ec2-user@%s", publicDns), "-i", "./"+pemName, "/bin/bash -s")
-	stdin, err = cmd.StdinPipe()
-	if err != nil {
-		log.AddError(err).Fatal("While creating stdin pipe")
-	}
-	defer stdin.Close()
-	io.WriteString(stdin, string(script))
+	api := base.Group("")
+	auth := api.Group("", gin.BasicAuth(gin.Accounts{
+		"sindre": "pass",
+	}))
 
-	err = cmd.Run()
-	if err != nil {
-		shouldCleanUp = true
-		log.AddError(err).Fatal("While running ssh filebeat settup")
-	}
+	auth.PUT("/server/:application/*server", newAppHandler(&c))
+	auth.POST("/key", newKeyHandler())
+	auth.POST("/keyCrypt", newKeyCryptHandler())
 
-	err = sendSlackMessage(fmt.Sprintf("`ssh ec2-user@%s -i %s`\n%[2]s\n```%s```", publicDns, pemName, keyMaterial))
-	if err != nil {
-		shouldCleanUp = true
-		log.Fatal(err)
-	}
+	/*
+		serverName := "devtest-entraos-notification3"
+		port := 18840
+		uriPath := "notifications"
+		elbListenerArn := "arn:aws:elasticloadbalancing:us-west-2:493376950721:listener/app/devtest-events2-lb/a3807cba101b280b/90abaa841820e9b2"
+		elbSecurityGroupId := "sg-1325864d"
+	*/
 
+	r.Run(":3030")
 }
 
 func lateExecuteDeletersWithErrorLogging(object, logMessage string, f func(...string) error, values ...string) func() {
 	return func() {
-		log.Info("Cleaning up: ", object)
+		s := fmt.Sprintf("Cleaning up: %s", object)
+		log.Info(s)
+		slack.SendStatus(s)
 		err := f(values...)
 		if err != nil {
 			log.AddError(err).Crit(logMessage)
 		}
+	}
+}
+
+func newKeyCryptHandler() func(*gin.Context) {
+	return func(c *gin.Context) {
+		key, err := ioutil.ReadAll(c.Request.Body)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"message": "Unable to read body",
+				"error":   err.Error(),
+			})
+			return
+		}
+		c.Request.Body.Close()
+		pk, err := crypto.Encrypt(string(key))
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"message": "Unable to Encrypt key",
+				"error":   err.Error(),
+			})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Encrypted key successfully",
+			"data":    pk,
+		})
+	}
+}
+
+type keyBody struct {
+	Key string `form:"key" json:"key" xml:"key" binding:"required"`
+}
+
+func newKeyHandler() func(*gin.Context) {
+	return func(c *gin.Context) {
+		var body keyBody
+		err := c.ShouldBind(&body)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"message": "Unable to get requred data from request. Supported formats are: JSON, XML and HTML form",
+				"error":   err.Error(),
+			})
+			return
+		}
+		pk, err := crypto.Decrypt(body.Data)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"message": "Unable to decrypt key",
+				"error":   err.Error(),
+			})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Dekoded key successfully",
+			"data":    pk,
+		})
+	}
+}
+
+type application struct {
+	Port             int    `form:"port" json:"port" xml:"port" binding:"required"`
+	Path             string `form:"path" json:"path" xml:"path" binding:"required"`
+	ELBListenerArn   string `form:"elb_listener_arn" json:"elb_listener_arn" xml:"elb_listener_arn" binding:"required"`
+	ELBSecurityGroup string `form:"elb_securitygroup_id" json:"elb_securitygroup_id" xml:"elb_securitygroup_id"`
+	Key              string `form:"key" json:"key" xml:"key"`
+}
+
+func newAppHandler(cld *cloud.AWS) func(*gin.Context) {
+	return func(c *gin.Context) {
+		appName := c.Param("application")
+		server := c.Param("server")[1:]
+		if len(server) == 0 {
+			server = appName
+		}
+		if err := cloud.CheckNameLen(server); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"message": fmt.Sprintf("Server name is limited by length"),
+				"error":   err.Error(),
+			})
+			return
+		}
+		var app application
+		err := c.ShouldBind(&app)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"message": "Unable to get requred data from request. Supported formats are: JSON, XML and HTML form",
+				"error":   err.Error(),
+			})
+			return
+		}
+		cld.CreateFromScratch(appName, app.Path, app.Port, app.ELBListenerArn, app.ELBSecurityGroup)
 	}
 }
 
