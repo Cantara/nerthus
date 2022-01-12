@@ -2,228 +2,517 @@ package aws
 
 import (
 	"fmt"
-	"io"
-	"io/ioutil"
 	"os"
-	"os/exec"
 	"time"
 
+	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go/service/elbv2"
 	log "github.com/cantara/bragi"
+	"github.com/cantara/nerthus/aws/key"
 	keylib "github.com/cantara/nerthus/aws/key"
 	loadbalancerlib "github.com/cantara/nerthus/aws/loadbalancer"
+	"github.com/cantara/nerthus/aws/security"
 	securitylib "github.com/cantara/nerthus/aws/security"
 	serverlib "github.com/cantara/nerthus/aws/server"
+	"github.com/cantara/nerthus/aws/tag"
 	vpclib "github.com/cantara/nerthus/aws/vpc"
-	"github.com/cantara/nerthus/crypto"
+	servershlib "github.com/cantara/nerthus/server"
 	"github.com/cantara/nerthus/slack"
 )
 
-func (c AWS) CreateFromScratch(service, path string, port int, ELBListenerArn, ELBSecurityGroup string) {
-	shouldCleanUp := false
-	deleters := NewStack()
-	defer func() {
-		if a := recover(); a != nil {
-			log.Warning("Recovered: ", a)
-		}
-		if !shouldCleanUp {
-			return
-		}
-		log.Info("Cleanup started.")
-		slack.SendStatus("Something went wrong starting cleanup.")
-		for delFunc := deleters.Pop(); delFunc != nil; delFunc = deleters.Pop() {
-			delFunc()
-		}
-		log.Info("Cleanup is \"done\", exiting.")
-		slack.SendStatus("Cleanup is \"done\".")
-	}()
+type Service struct {
+	Port             int    `form:"port" json:"port" xml:"port" binding:"required"`
+	Path             string `form:"path" json:"path" xml:"path" binding:"required"`
+	ELBListenerArn   string `form:"elb_listener_arn" json:"elb_listener_arn" xml:"elb_listener_arn" binding:"required"`
+	ELBSecurityGroup string `form:"elb_securitygroup_id" json:"elb_securitygroup_id" xml:"elb_securitygroup_id"`
+	UpdateProp       string `form:"semantic_update_service_properties" json:"semantic_update_service_properties" xml:"semantic_update_service_properties"`
+	ArtifactId       string `form:"artifact_id" json:"artifact_id" xml:"artifact_id" binding:"required"`
+	LocalOverride    string `form:"local_override_properties" json:"local_override_properties" xml:"local_override_properties"`
+	HealthReport     string `form:"health_report_enpoint" json:"health_report_enpoint" xml:"health_report_enpoint"`
+	FilebeatConf     string `form:"filebeat_configuration" json:"filebeat_configuration" xml:"filebeat_configuration"`
+	Key              string `form:"key" json:"key" xml:"key"`
+}
 
+func (c AWS) AddServiceToServer(scope, serverName string, k key.Key, sg security.Group, service Service) (cryptData string) {
+	seq := sequence{
+		ec2:           c.ec2,
+		elb:           c.elb,
+		shouldCleanUp: false,
+		deleters:      NewStack(),
+		scope:         scope,
+		service:       service,
+		key:           k,
+		securityGroup: sg,
+	}
+	defer seq.Cleanup()
+	//Get server from server name
+	s, err := serverlib.GetServer(serverName, scope, k, sg, c.ec2)
+	if err != nil {
+		log.AddError(err).Fatal("While getting server by name")
+	}
+	seq.server = s
+
+	//AWS
+	isNotNewService, err := CheckIfServiceExcistsInScope(scope, service.ArtifactId, c.ec2)
+	if err != nil {
+		log.AddError(err).Fatal("While chekking if service exits in scope")
+	}
+	if isNotNewService {
+		seq.GetTargetGroup()
+	} else {
+		seq.CreateTargetGroup()
+	}
+	seq.CreateTarget()
+	if !isNotNewService {
+		seq.AddRuleToListener()
+	}
+
+	if isNotNewService {
+		seq.TagAdditionalServer()
+	} else {
+		seq.TagNewService()
+	}
+	seq.InstallOnServer()
+
+	seq.SendCertLogin()
+	seq.FinishedAllOpperations()
+	cryptData = seq.cryptData
+	return
+}
+
+func (c AWS) AddNewServerToScope(scope, serverName string, v vpclib.VPC, k key.Key, sg security.Group, service Service) (cryptData string) {
+	seq := sequence{
+		ec2:           c.ec2,
+		elb:           c.elb,
+		shouldCleanUp: false,
+		deleters:      NewStack(),
+		scope:         scope,
+		service:       service,
+		vpc:           v,
+		key:           k,
+		securityGroup: sg,
+	}
+	defer seq.Cleanup()
+
+	//AWS
+	seq.CheckServerName(serverName)
+	seq.StartingServerSettup()
+	seq.CreateNewServer(serverName)
+	seq.WaitForServerToStart()
+	isNotNewService, err := CheckIfServiceExcistsInScope(scope, service.ArtifactId, c.ec2)
+	if err != nil {
+		log.AddError(err).Fatal("While chekking if service exits in scope")
+	}
+	if isNotNewService {
+		seq.GetTargetGroup()
+	} else {
+		seq.CreateTargetGroup()
+	}
+	seq.CreateTarget()
+	if !isNotNewService {
+		seq.AddRuleToListener()
+	}
+	seq.DoneSettingUpServer()
+
+	if isNotNewService {
+		seq.TagAdditionalServer()
+	} else {
+		seq.TagNewService()
+	}
+	seq.InstallOnServer()
+
+	seq.SendCertLogin()
+	seq.FinishedAllOpperations()
+	cryptData = seq.cryptData
+	return
+}
+
+func (c AWS) CreateNewServerInScope(scope, serverName string, service Service) (cryptData string) {
+	seq := sequence{
+		ec2:           c.ec2,
+		elb:           c.elb,
+		shouldCleanUp: false,
+		deleters:      NewStack(),
+		scope:         scope,
+		service:       service,
+	}
+	defer seq.Cleanup()
+
+	//AWS
+	seq.CheckServerName(serverName)
+	seq.StartingServerSettup()
+	seq.CreateKey()
+	seq.GetVPC()
+	seq.CreateSecurityGroup()
+	seq.CreateNewServer(serverName)
+	seq.WaitForServerToStart()
+	seq.CreateTargetGroup()
+	seq.CreateTarget()
+	seq.AddRuleToListener()
+	seq.DoneSettingUpServer()
+	seq.TagNewService()
+
+	seq.InstallOnServer()
+
+	seq.SendCertLogin()
+	seq.FinishedAllOpperations()
+	cryptData = seq.cryptData
+	return
+}
+
+type sequence struct {
+	ec2           *ec2.EC2
+	elb           *elbv2.ELBV2
+	shouldCleanUp bool
+	deleters      Stack
+	scope         string
+	service       Service
+	key           keylib.Key
+	PemName       string
+	cryptData     string
+	vpc           vpclib.VPC
+	securityGroup securitylib.Group
+	server        serverlib.Server
+	targetGroup   loadbalancerlib.TargetGroup
+	rule          loadbalancerlib.Rule
+	serversh      servershlib.Server
+	user          servershlib.User
+}
+
+func (c *sequence) Cleanup() {
+	if a := recover(); a != nil {
+		log.Warning("Recovered: ", a)
+		c.shouldCleanUp = true
+	}
+	if !c.shouldCleanUp {
+		return
+	}
+	log.Info("Cleanup started.")
+	c.cryptData = ""
+	slack.SendStatus("Something went wrong starting cleanup.")
+	for delFunc := c.deleters.Pop(); delFunc != nil; delFunc = c.deleters.Pop() {
+		delFunc()
+	}
+	log.Info("Cleanup is \"done\", exiting.")
+	slack.SendStatus("Cleanup is \"done\".")
+}
+
+func (c sequence) CheckServerName(name string) {
+	available, err := serverlib.NameAvailable(name, c.ec2)
+	if err != nil {
+		log.AddError(err).Fatal("While checking server name availablility")
+	}
+	if !available {
+		log.Fatal("Servername is not available")
+	}
+}
+
+func (c sequence) StartingServerSettup() {
+	s := fmt.Sprintf("Starting to settyp server %s in aws.", c.scope)
+	log.Info(s)
+	slack.SendStatus(s)
+}
+
+func (c *sequence) CreateKey() {
 	// Create a new key
-	key, err := keylib.NewKey(service, c.ec2)
+	key, err := keylib.NewKey(c.scope, c.ec2)
 	_, err = key.Create()
 	if err != nil {
 		log.AddError(err).Fatal("While creating keypair")
 	}
-	deleters.Push(cleanup("Key pair", "while deleting created key pair", &key))
+	c.deleters.Push(cleanup("Key pair", "while deleting created key pair", &key))
 	s := fmt.Sprintf("Created key pair %s %s", key.Name, key.Fingerprint)
 	log.Info(s)
 	slack.SendStatus(s)
-	keyEncrypted, err := crypto.Encrypt(key.Material)
-	if err != nil {
-		shouldCleanUp = true
-		log.AddError(err).Fatal("while encrypting key")
-	}
-	pemName := fmt.Sprintf("%s.pem", key.Name)
-	pem, err := os.OpenFile("./"+pemName, os.O_WRONLY|os.O_CREATE, 0600)
+	pem, err := os.OpenFile("./"+key.PemName, os.O_WRONLY|os.O_CREATE, 0600)
 	if err == nil {
 		fmt.Fprint(pem, key.Material)
 		pem.Close()
 	}
-	defer os.Remove(pemName)
+	c.key = key
+	c.PemName = c.key.PemName
+}
 
+func (c *sequence) GetVPC() {
 	// Get a list of VPCs so we can associate the group with the first VPC.
 	vpc, err := vpclib.GetVPC(c.ec2)
 	if err != nil {
-		shouldCleanUp = true
 		log.AddError(err).Fatal("While getting vpcId")
 	}
-	s = fmt.Sprintf("Found VPCId: %s.", vpc.Id)
+	s := fmt.Sprintf("Found VPCId: %s.", vpc.Id)
 	log.Info(s)
 	slack.SendStatus(s)
+	c.vpc = vpc
+}
 
-	securityGroup, err := securitylib.NewGroup(service, vpc, c.ec2)
+func (c *sequence) CreateSecurityGroup() {
+	securityGroup, err := securitylib.NewGroup(c.scope, c.vpc, c.ec2)
 	_, err = securityGroup.Create()
 	if err != nil {
-		shouldCleanUp = true
 		log.AddError(err).Fatal("While creating security group")
 	}
-	deleters.Push(cleanup("Security group", "while deleting created security group",
+	c.deleters.Push(cleanup("Security group", "while deleting created security group",
 		&securityGroup))
-	s = fmt.Sprintf("Created security group %s with VPC %s.",
-		securityGroup.Id, vpc.Id)
+	s := fmt.Sprintf("Created security group %s with VPC %s.",
+		securityGroup.Id, c.vpc.Id)
 	log.Info(s)
 	slack.SendStatus(s)
+	c.securityGroup = securityGroup
+	c.AddBaseAuthorizationToSecurityGroup()
+}
 
-	err = securityGroup.AddBaseAuthorization(ELBSecurityGroup, port)
+func (c *sequence) AddBaseAuthorizationToSecurityGroup() {
+	err := c.securityGroup.AddBaseAuthorization(c.service.ELBSecurityGroup, c.service.Port)
 	if err != nil {
-		shouldCleanUp = true
 		log.AddError(err).Fatal("Could not add base authorization")
 	}
-	s = fmt.Sprintf("Added base authorization to security group: %s.", securityGroup.Id)
+	s := fmt.Sprintf("Added base authorization to security group: %s.", c.securityGroup.Id)
 	log.Info(s)
 	slack.SendStatus(s)
+}
 
-	server, err := serverlib.NewServer(service, key, securityGroup, c.ec2)
+func (c *sequence) CreateNewServer(serverName string) {
+	server, err := serverlib.NewServer(serverName, c.scope, c.key, c.securityGroup, c.ec2)
 	_, err = server.Create()
 	if err != nil {
-		shouldCleanUp = true
 		log.Fatal("Could not create server", err)
 	}
-	deleters.Push(cleanup("Server", "while deleting created server", &server))
-	s = fmt.Sprintf("Created server: %s.", server.Id)
+	c.deleters.Push(cleanup("Server", "while deleting created server", &server))
+	s := fmt.Sprintf("Created server: %s.", server.Id)
 	log.Info(s)
 	slack.SendStatus(s)
+	c.server = server
+}
+
+func (c *sequence) WaitForServerToStart() {
+	err := c.server.WaitUntilRunning()
+	s := fmt.Sprintf("Server %s is now in running state.", c.server.Id)
+	log.Info(s)
+	slack.SendStatus(s)
+	_, err = c.server.GetPublicDNS()
+	if err != nil {
+		log.AddError(err).Fatal("While getting public dns name")
+	}
+	s = fmt.Sprintf("Got server %s's public dns %s.", c.server.Id, c.server.PublicDNS)
+	log.Info(s)
+	slack.SendStatus(s)
+}
+
+func (c *sequence) CreateTargetGroup() {
+	targetGroup, err := loadbalancerlib.NewTargetGroup(c.scope, c.service.ArtifactId, c.service.Path, c.service.Port, c.vpc, c.elb)
+	_, err = targetGroup.Create()
+	if err != nil {
+		log.AddError(err).Fatal(fmt.Sprintf("While creating target group for %s", c.server.Name))
+	}
+	c.deleters.Push(cleanup("Target group", "while deleting created target group", &targetGroup))
+	s := fmt.Sprintf("Created target group: %s.", targetGroup.ARN)
+	log.Info(s)
+	slack.SendStatus(s)
+	c.targetGroup = targetGroup
+}
+
+func (c *sequence) GetTargetGroup() {
+	targetGroup, err := loadbalancerlib.GetTargetGroup(c.scope, c.service.ArtifactId, c.service.Path, c.service.Port, c.elb)
+	if err != nil {
+		log.AddError(err).Fatal(fmt.Sprintf("While getting target group for %s", c.server.Name))
+	}
+	s := fmt.Sprintf("Got target group: %s.", targetGroup.ARN)
+	log.Info(s)
+	slack.SendStatus(s)
+	c.targetGroup = targetGroup
+}
+
+func (c *sequence) CreateTarget() {
+	target, err := loadbalancerlib.NewTarget(c.targetGroup, c.server, c.elb)
+	_, err = target.Create()
+	if err != nil {
+		log.AddError(err).Fatal(fmt.Sprintf("While adding target to target group %s", c.targetGroup.ARN))
+	}
+	c.deleters.Push(cleanup("Target in targetgroup", "while removing registered target from targetgroup", &target))
+	s := fmt.Sprintf("Registered server %s as target for target group %s.", c.server.Id, c.targetGroup.ARN)
+	log.Info(s)
+	slack.SendStatus(s)
+}
+
+func (c *sequence) AddRuleToListener() {
+	listener, err := loadbalancerlib.GetListener(c.service.ELBListenerArn, c.elb)
+	rule, err := loadbalancerlib.NewRule(listener, c.targetGroup, c.elb)
+	_, err = rule.Create()
+	if err != nil {
+		log.AddError(err).Fatal(fmt.Sprintf("While adding rule to elb %s", listener.ARN))
+	}
+	c.deleters.Push(cleanup("Rule", "while removing rule added to loadbalancer", &rule))
+	s := fmt.Sprintf("Adding elastic load balancer rule: %s.", rule.ARN)
+	log.Info(s)
+	slack.SendStatus(s)
+	c.rule = rule
+}
+
+func (c *sequence) TagNewService() {
+	VolumeId, err := c.server.GetVolumeId()
+	if err != nil {
+		log.AddError(err).Fatal(fmt.Sprintf("While getting volume id for server %s", c.server.Name))
+	}
+	listener, err := loadbalancerlib.GetListener(c.service.ELBListenerArn, c.elb)
+	loadbalancerARN, err := listener.GetLoadbalancer()
+	if err != nil {
+		log.AddError(err).Fatal(fmt.Sprintf("While getting loadbalancerARN for listener %s", c.service.ELBListenerArn))
+	}
+	t, err := tag.NewNewTag(c.service.ArtifactId, c.scope, c.key.Id, c.securityGroup.Id, c.server.Id, VolumeId, c.server.NetworkInterfaceId, c.server.ImageId,
+		c.targetGroup.ARN, c.rule.ARN, c.service.ELBListenerArn, loadbalancerARN, c.ec2, c.elb)
+	_, err = t.Create()
+	if err != nil {
+		log.AddError(err).Fatal(fmt.Sprintf("While tagging new service %s", c.service.ArtifactId))
+	}
+	c.deleters.Push(cleanup("Tag", "while removing tag added to all resources used by service", &t))
+	s := fmt.Sprintf("Adding tag to all resources used by service: %s.", c.service.ArtifactId)
+	log.Info(s)
+	slack.SendStatus(s)
+}
+
+func (c *sequence) TagAdditionalServer() {
+	VolumeId, err := c.server.GetVolumeId()
+	if err != nil {
+		log.AddError(err).Fatal(fmt.Sprintf("While getting volume id for server %s", c.server.Name))
+	}
+	t, err := tag.NewAddTag(c.service.ArtifactId, c.scope, c.server.Id, VolumeId, c.server.NetworkInterfaceId, c.server.ImageId, c.ec2)
+	_, err = t.Create()
+	if err != nil {
+		log.AddError(err).Fatal(fmt.Sprintf("While tagging additional service %s", c.service.ArtifactId))
+	}
+	c.deleters.Push(cleanup("Tag", "while removing tag added to resources used by the additional service", &t))
+	s := fmt.Sprintf("Adding tag to resources used by additional service: %s.", c.service.ArtifactId)
+	log.Info(s)
+	slack.SendStatus(s)
+}
+
+func (c sequence) DoneSettingUpServer() {
+	s := fmt.Sprintf("Done setting up server in aws %s.", c.server.Id)
+	log.Info(s)
+	slack.SendStatus(s)
+}
+
+func (c sequence) WaitForELBRuleToBeHealthy() {
+	s := fmt.Sprintf("Started waiting for elb rule to be healthy %s.", c.rule.ARN)
+	log.Info(s)
+	slack.SendStatus(s)
+	time.Sleep(30 * time.Second)
+	s = fmt.Sprintf("Done waiting for elb rule to be healthy %s.", c.rule.ARN)
+	log.Info(s)
+	slack.SendStatus(s)
+}
+
+func (c sequence) StartingServiceInstallation() {
+	time.Sleep(time.Second * 30)
+	s := fmt.Sprintf("Starting to install stuff on server %s.", c.server.PublicDNS)
+	log.Info(s)
+	slack.SendStatus(s)
+}
+
+func (c sequence) UpdateServer() {
+	err := c.serversh.Update()
+	if err != nil {
+		log.AddError(err).Fatal(fmt.Sprintf("While updatating %s", c.server.PublicDNS))
+	}
+	s := fmt.Sprintf("Updated server %s.", c.server.PublicDNS)
+	log.Info(s)
+	slack.SendStatus(s)
+}
+
+func (c *sequence) InstallPrograms() {
+	java, err := servershlib.NewJava(servershlib.JAVA_ONE_ELEVEN, c.serversh)
+	_, err = java.Create()
+	if err != nil {
+		log.AddError(err).Fatal(fmt.Sprintf("While verifying or installing java %s", servershlib.JAVA_ONE_ELEVEN))
+	}
+	c.deleters.Push(cleanup("Java from server", "while removing java if it was installed", &java))
+	s := fmt.Sprintf("Verified or installed java %s.", servershlib.JAVA_ONE_ELEVEN)
+	log.Info(s)
+	slack.SendStatus(s)
+}
+
+func (c *sequence) AddUser() {
+	user, err := servershlib.NewUser(c.service.ArtifactId, c.serversh)
+	_, err = user.Create()
+	if err != nil {
+		log.AddError(err).Fatal(fmt.Sprintf("While adding user %s", user.Name))
+	}
+	c.deleters.Push(cleanup("User from server", "while removing user from server", &user))
+	s := fmt.Sprintf("Added user %s.", user.Name)
+	log.Info(s)
+	slack.SendStatus(s)
+	c.user = user
+}
+
+func (c *sequence) InstallService() {
+	service, err := servershlib.NewService(c.service.ArtifactId, c.service.UpdateProp, c.service.LocalOverride, c.service.HealthReport, c.service.Path, c.service.Port, c.user, c.serversh)
+	_, err = service.Create()
+	if err != nil {
+		log.AddError(err).Fatal("While setting up service in user")
+	}
+	c.deleters.Push(cleanup("Service installed on server", "while stopping service", &service))
+	s := fmt.Sprintf("Done installing service on server %s.", c.server.PublicDNS)
+	log.Info(s)
+	slack.SendStatus(s)
+}
+
+func (c *sequence) InstallFilebeat() {
+	return //TODO: remove me
+	filebeat, err := servershlib.NewFilebeat("asdasd", c.service.FilebeatConf, c.serversh)
+	_, err = filebeat.Create()
+	if err != nil {
+		log.AddError(err).Fatal(fmt.Sprintf("While installing filebeat with config %s", c.service.FilebeatConf))
+	}
+	//c.deleters.Push(cleanup("Filebeat config", "while removing filebeat config", &filebeat))
+	c.deleters.Push(cleanup("Filebeat from server", "while removing filebeat from server", &filebeat))
+	s := fmt.Sprintf("Done installing filebeat on server %s.", c.server.PublicDNS)
+	log.Info(s)
+	slack.SendStatus(s)
+}
+
+func (c *sequence) SendCertLogin() {
+	encrypted, err := Encrypt(c.scope, c.vpc, c.key, c.securityGroup)
+	if err != nil {
+		log.AddError(err).Fatal("While encrypting data to send to slack")
+	}
+	c.cryptData = encrypted
+	err = slack.SendServer(fmt.Sprintf("`ssh ec2-user@%s -i %s`\n%s\n```%s```", c.server.PublicDNS, c.key.PemName, c.service.ArtifactId, encrypted))
+	if err != nil {
+		log.AddError(err).Fatal("While sending encrypted cert and login to slack")
+	}
+}
+
+func (c *sequence) FinishedAllOpperations() {
+	s := fmt.Sprintf("Completed all opperations for creating the new server %s.", c.server.Name)
+	log.Info(s)
+	slack.SendStatus(s)
+	//shouldCleanUp = true
+	return
+}
+
+func (seq *sequence) InstallOnServer() {
+	//Server
+	seq.WaitForELBRuleToBeHealthy()
+	seq.StartingServiceInstallation()
+	serv, _ := servershlib.NewServer(seq.server.PublicDNS, seq.key.PemName)
+	seq.serversh = serv
+	seq.UpdateServer()
+	seq.InstallPrograms()
+	seq.AddUser()
+	seq.InstallService()
+	seq.InstallFilebeat()
+}
+
+/*
+Hazelcast stuff, will readd you later
 
 	if false { // Enable hazelcast
 		err = securityGroup.AuthorizeHazelcast()
 		if err != nil {
-			shouldCleanUp = true
 			log.AddError(err).Fatal("Could not add hazelcast authorization")
 		}
 		s = fmt.Sprintf("Added hazelcast authorization to security group: %s.", securityGroup.Id)
 		log.Info(s)
 		slack.SendStatus(s)
 	}
-
-	err = server.WaitForRunning()
-	s = fmt.Sprintf("Server %s is now in running state.", server.Id)
-	log.Info(s)
-	slack.SendStatus(s)
-	_, err = server.GetPublicDNS()
-	if err != nil {
-		shouldCleanUp = true
-		log.AddError(err).Fatal("While getting public dns name")
-	}
-	s = fmt.Sprintf("Got server %s's public dns %s.", server.Id, server.PublicDNS)
-	log.Info(s)
-	slack.SendStatus(s)
-
-	targetGroup, err := loadbalancerlib.NewTargetGroup(service, path, port, vpc, c.elb)
-	_, err = targetGroup.Create()
-	if err != nil {
-		shouldCleanUp = true
-		log.AddError(err).Fatal(fmt.Sprintf("While creating target group for %s", server.Name))
-	}
-	deleters.Push(cleanup("Target group", "while deleting created target group", &targetGroup))
-	s = fmt.Sprintf("Created target group: %s.", targetGroup.ARN)
-	log.Info(s)
-	slack.SendStatus(s)
-
-	target, err := loadbalancerlib.NewTarget(targetGroup, server, c.elb)
-	_, err = target.Create()
-	if err != nil {
-		shouldCleanUp = true
-		log.AddError(err).Fatal(fmt.Sprintf("While adding target to target group %s", targetGroup.ARN))
-	}
-	deleters.Push(cleanup("Target in targetgroup", "while removing registered targetgroup", &target))
-	s = fmt.Sprintf("Registered server %s as target for target group %s.", server.Id, targetGroup.ARN)
-	log.Info(s)
-	slack.SendStatus(s)
-
-	listener, err := loadbalancerlib.GetListener(ELBListenerArn, c.elb)
-	rule, err := loadbalancerlib.NewRule(listener, targetGroup, c.elb)
-	_, err = rule.Create()
-	if err != nil {
-		shouldCleanUp = true
-		log.AddError(err).Fatal(fmt.Sprintf("While adding rule to elb %s", listener.ARN))
-	}
-	deleters.Push(cleanup("Rule", "while removing rule added to loadbalancer", &rule))
-	s = fmt.Sprintf("Adding elastic load balancer rule: %s.", rule.ARN)
-	log.Info(s)
-	slack.SendStatus(s)
-	s = fmt.Sprintf("Done setting up server in aws %s.", server.Id)
-	log.Info(s)
-	slack.SendStatus(s)
-
-	s = fmt.Sprintf("Started waiting for elb rule to healthy %s.", rule.ARN)
-	log.Info(s)
-	slack.SendStatus(s)
-	time.Sleep(30 * time.Second)
-	s = fmt.Sprintf("Done waiting for elb rule to healthy %s.", rule.ARN)
-	log.Info(s)
-	slack.SendStatus(s)
-	s = fmt.Sprintf("Starting to install stuff on server %s.", server.PublicDNS)
-	log.Info(s)
-	slack.SendStatus(s)
-	script, err := ioutil.ReadFile("./new_devtest_server.sh")
-	if err != nil {
-		log.AddError(err).Fatal("While reading in base script")
-	}
-	cmd := exec.Command("ssh", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no",
-		fmt.Sprintf("ec2-user@%s", server.PublicDNS), "-i", "./"+pemName, "/bin/bash -s")
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		log.AddError(err).Fatal("While creating stdin pipe")
-	}
-	defer stdin.Close()
-	io.WriteString(stdin, string(script))
-
-	err = cmd.Run()
-	if err != nil {
-		shouldCleanUp = true
-		log.AddError(err).Fatal("While running ssh settup command")
-	}
-	s = fmt.Sprintf("Done installing service on server %s.", server.PublicDNS)
-	log.Info(s)
-	slack.SendStatus(s)
-
-	script, err = ioutil.ReadFile("./new_devtest_server.sh")
-	if err != nil {
-		log.AddError(err).Fatal("While reading in filebeat script")
-	}
-	cmd = exec.Command("ssh", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no",
-		fmt.Sprintf("ec2-user@%s", server.PublicDNS), "-i", "./"+pemName, "/bin/bash -s")
-	stdin, err = cmd.StdinPipe()
-	if err != nil {
-		log.AddError(err).Fatal("While creating stdin pipe")
-	}
-	defer stdin.Close()
-	io.WriteString(stdin, string(script))
-
-	err = cmd.Run()
-	if err != nil {
-		shouldCleanUp = true
-		log.AddError(err).Fatal("While running ssh filebeat settup")
-	}
-	s = fmt.Sprintf("Done installing filebeat on server %s.", server.PublicDNS)
-	log.Info(s)
-	slack.SendStatus(s)
-	err = slack.SendServer(fmt.Sprintf("`ssh ec2-user@%s -i %s`\n%[2]s\n```%s```", server.PublicDNS, pemName, keyEncrypted))
-	if err != nil {
-		shouldCleanUp = true
-		log.Fatal(err)
-	}
-	s = fmt.Sprintf("Completed all opperations for creating the new server %s.", server.Name)
-	log.Info(s)
-	slack.SendStatus(s)
-	shouldCleanUp = true
-}
+*/

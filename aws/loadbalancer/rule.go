@@ -14,6 +14,7 @@ type Rule struct {
 	listener    Listener
 	targetGroup TargetGroup
 	elb         *elbv2.ELBV2
+	created     bool
 }
 
 func NewRule(l Listener, tg TargetGroup, elb *elbv2.ELBV2) (r Rule, err error) {
@@ -25,6 +26,56 @@ func NewRule(l Listener, tg TargetGroup, elb *elbv2.ELBV2) (r Rule, err error) {
 		listener:    l,
 		targetGroup: tg,
 		elb:         elb,
+	}
+	return
+}
+
+func GetRules(listenerARN string, elb *elbv2.ELBV2) (r []Rule, err error) {
+	err = util.CheckELBV2Session(elb)
+	if err != nil {
+		return
+	}
+	input := &elbv2.DescribeRulesInput{
+		ListenerArn: aws.String(listenerARN),
+	}
+
+	result, err := elb.DescribeRules(input)
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			switch aerr.Code() {
+			case elbv2.ErrCodeListenerNotFoundException:
+				fmt.Println(elbv2.ErrCodeListenerNotFoundException, aerr.Error())
+				err = util.CreateError{
+					Text: "Listener not found",
+					Err:  aerr,
+				}
+			case elbv2.ErrCodeRuleNotFoundException:
+				fmt.Println(elbv2.ErrCodeRuleNotFoundException, aerr.Error())
+				err = util.CreateError{
+					Text: "Rule not found",
+					Err:  aerr,
+				}
+			case elbv2.ErrCodeUnsupportedProtocolException:
+				fmt.Println(elbv2.ErrCodeUnsupportedProtocolException, aerr.Error())
+				err = util.CreateError{
+					Text: "Unsupported protocol",
+					Err:  aerr,
+				}
+			}
+		}
+		return
+	}
+
+	paths := []string{}
+	for _, rule := range result.Rules {
+		for _, condition := range rule.Conditions {
+			if aws.StringValue(condition.Field) != "path-pattern" {
+				continue
+			}
+			for _, path := range condition.PathPatternConfig.Values {
+				paths = append(paths, aws.StringValue(path))
+			}
+		}
 	}
 	return
 }
@@ -162,10 +213,14 @@ func (r *Rule) Create() (id string, err error) {
 	}
 	r.ARN = aws.StringValue(result.Rules[0].RuleArn)
 	id = r.ARN
+	r.created = true
 	return
 }
 
 func (r *Rule) Delete() (err error) {
+	if !r.created {
+		return
+	}
 	err = util.CheckELBV2Session(r.elb)
 	if err != nil {
 		return

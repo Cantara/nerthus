@@ -1,0 +1,14 @@
+port=
+ami=
+aeskey=
+region=
+username=
+password=
+
+entraos_api_uri=
+slack_channel_secret=
+slack_channel_status=
+whydah_uri=
+whydah_application_name=
+whydah_application_id=
+whydah_application_secret=

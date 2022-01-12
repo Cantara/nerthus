@@ -23,8 +23,9 @@
 hs_err_pid*
 
 nerthus
+.env
 /tmp
 *.out
 *.pem
 # Temp adding this file until it no longer has secrets in it
-new_devtest_server.sh
+*.sh

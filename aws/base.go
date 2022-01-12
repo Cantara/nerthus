@@ -1,13 +1,18 @@
 package aws
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	log "github.com/cantara/bragi"
+	"github.com/cantara/nerthus/aws/key"
+	"github.com/cantara/nerthus/aws/security"
 	"github.com/cantara/nerthus/aws/util"
+	"github.com/cantara/nerthus/aws/vpc"
+	"github.com/cantara/nerthus/crypto"
 	"github.com/cantara/nerthus/slack"
 )
 
@@ -26,6 +31,10 @@ func CheckNameLen(name string) error {
 type AWS struct {
 	ec2 *ec2.EC2
 	elb *elbv2.ELBV2
+}
+
+func (a AWS) GetELB() *elbv2.ELBV2 {
+	return a.elb
 }
 
 func (a *AWS) NewEC2(c client.ConfigProvider) {
@@ -109,4 +118,47 @@ func (s Stack) First() func() {
 
 func (s Stack) Empty() bool {
 	return s.Len() == 0
+}
+
+type cryptoData struct {
+	Scope         string         `json:"scope"`
+	VPC           vpc.VPC        `json:"vpc"`
+	Key           key.Key        `json:"key"`
+	SecurityGroup security.Group `json:"security_group"`
+}
+
+func Encrypt(scope string, v vpc.VPC, k key.Key, sg security.Group) (encrypted string, err error) {
+	data := cryptoData{
+		VPC:           v,
+		Key:           k,
+		Scope:         scope,
+		SecurityGroup: sg,
+	}
+	fmt.Println(data)
+	b, err := json.Marshal(data)
+	if err != nil {
+		return
+	}
+	encrypted, err = crypto.Encrypt(b)
+	return
+}
+
+func Decrypt(dataCrypt string, a *AWS) (scope string, v vpc.VPC, k key.Key, sg security.Group, err error) {
+	data, err := crypto.Decrypt(dataCrypt)
+	if err != nil {
+		return
+	}
+	var cd cryptoData
+	err = json.Unmarshal(data, &cd)
+	if err != nil {
+		return
+	}
+	scope = cd.Scope
+	v = cd.VPC
+	k = cd.Key.WithEC2(a.ec2)
+	k.Scope = scope
+	sg = cd.SecurityGroup.WithEC2(a.ec2)
+	sg.Scope = scope
+	fmt.Println(cd)
+	return
 }

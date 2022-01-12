@@ -14,6 +14,7 @@ type Target struct {
 	targetGroup TargetGroup
 	server      server.Server
 	elb         *elbv2.ELBV2
+	created     bool
 }
 
 func NewTarget(tg TargetGroup, s server.Server, elb *elbv2.ELBV2) (t Target, err error) {
@@ -75,10 +76,14 @@ func (t *Target) Create() (id string, err error) {
 		}
 		return
 	}
+	t.created = true
 	return
 }
 
 func (t *Target) Delete() (err error) {
+	if !t.created {
+		return
+	}
 	err = util.CheckELBV2Session(t.elb)
 	if err != nil {
 		return

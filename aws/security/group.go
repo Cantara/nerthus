@@ -11,23 +11,24 @@ import (
 )
 
 type Group struct {
-	Service string
-	Name    string
-	Id      string
+	Scope   string `json:"-"`
+	Name    string `json:"name"`
+	Id      string `json:"id"`
 	vpc     vpc.VPC
 	ec2     *ec2.EC2
+	created bool
 }
 
-func NewGroup(service string, vpc vpc.VPC, e2 *ec2.EC2) (g Group, err error) {
+func NewGroup(scope string, vpc vpc.VPC, e2 *ec2.EC2) (g Group, err error) {
 	err = util.CheckEC2Session(e2)
 	if err != nil {
 		return
 	}
 	g = Group{
-		Service: service,
-		Name:    service + "-sg",
-		vpc:     vpc,
-		ec2:     e2,
+		Scope: scope,
+		Name:  scope + "-sg",
+		vpc:   vpc,
+		ec2:   e2,
 	}
 	return
 }
@@ -39,7 +40,7 @@ func (g *Group) Create() (groupId string, err error) {
 	}
 	secGroupRes, err := g.ec2.CreateSecurityGroup(&ec2.CreateSecurityGroupInput{
 		GroupName:   aws.String(g.Name),
-		Description: aws.String("Security group for service: " + g.Service),
+		Description: aws.String("Security group for scope: " + g.Scope),
 		VpcId:       aws.String(g.vpc.Id),
 	})
 	if err != nil {
@@ -74,7 +75,11 @@ func (g *Group) Create() (groupId string, err error) {
 		Tags: []*ec2.Tag{
 			{
 				Key:   aws.String("Name"),
-				Value: aws.String(g.Service),
+				Value: aws.String(g.Scope),
+			},
+			{
+				Key:   aws.String("Scope"),
+				Value: aws.String(g.Scope),
 			},
 		},
 	})
@@ -85,10 +90,30 @@ func (g *Group) Create() (groupId string, err error) {
 		}
 		return
 	}
+	g.created = true
 	return groupId, nil
 }
 
+func (g Group) Wait() (err error) {
+	if !g.created {
+		return
+	}
+	err = util.CheckEC2Session(g.ec2)
+	if err != nil {
+		return
+	}
+	err = g.ec2.WaitUntilSecurityGroupExists(&ec2.DescribeSecurityGroupsInput{
+		GroupIds: []*string{
+			aws.String(g.Id),
+		},
+	})
+	return
+}
+
 func (g *Group) Delete() (err error) {
+	if !g.created {
+		return
+	}
 	err = util.CheckEC2Session(g.ec2)
 	if err != nil {
 		return
@@ -176,4 +201,9 @@ func (g *Group) AuthorizeHazelcast() (err error) {
 	}
 
 	return
+}
+
+func (g Group) WithEC2(e *ec2.EC2) Group {
+	g.ec2 = e
+	return g
 }

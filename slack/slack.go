@@ -23,9 +23,9 @@ func SendMessage(message, slackId string) (err error) {
 }
 
 func SendServer(message string) (err error) {
-	return SendMessage(message, os.Getenv("slack_channel"))
+	return SendMessage(message, os.Getenv("slack_channel_secret"))
 }
 
 func SendStatus(message string) (err error) {
-	return SendMessage(message, "C02PUP3QTL4")
+	return SendMessage(message, os.Getenv("slack_channel_status"))
 }

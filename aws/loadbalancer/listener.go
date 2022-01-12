@@ -1,6 +1,8 @@
 package loadbalancer
 
 import (
+	"fmt"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/elbv2"
@@ -20,6 +22,89 @@ func GetListener(arn string, elb *elbv2.ELBV2) (l Listener, err error) {
 	l = Listener{
 		ARN: arn,
 		elb: elb,
+	}
+	return
+}
+
+func (l Listener) GetLoadbalancer() (loadbalancer string, err error) {
+	result, err := l.elb.DescribeListeners(&elbv2.DescribeListenersInput{
+		ListenerArns: []*string{
+			aws.String(l.ARN),
+		},
+	})
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			switch aerr.Code() {
+			case elbv2.ErrCodeListenerNotFoundException:
+				fmt.Println(elbv2.ErrCodeListenerNotFoundException, aerr.Error())
+				err = util.CreateError{
+					Text: "Listener not found",
+					Err:  aerr,
+				}
+			case elbv2.ErrCodeLoadBalancerNotFoundException:
+				fmt.Println(elbv2.ErrCodeLoadBalancerNotFoundException, aerr.Error())
+				err = util.CreateError{
+					Text: "Loadbalancer not found",
+					Err:  aerr,
+				}
+			case elbv2.ErrCodeUnsupportedProtocolException:
+				fmt.Println(elbv2.ErrCodeUnsupportedProtocolException, aerr.Error())
+				err = util.CreateError{
+					Text: "Unsupported protocol",
+					Err:  aerr,
+				}
+			}
+		}
+		return
+	}
+	loadbalancer = aws.StringValue(result.Listeners[0].LoadBalancerArn)
+	return
+}
+
+func GetListeners(loadbalancerARN string, elb *elbv2.ELBV2) (l []Listener, err error) {
+	err = util.CheckELBV2Session(elb)
+	if err != nil {
+		return
+	}
+	input := &elbv2.DescribeListenersInput{
+		LoadBalancerArn: aws.String(loadbalancerARN),
+	}
+
+	result, err := elb.DescribeListeners(input)
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			switch aerr.Code() {
+			case elbv2.ErrCodeListenerNotFoundException:
+				err = util.CreateError{
+					Text: "Listener not found",
+					Err:  aerr,
+				}
+			case elbv2.ErrCodeLoadBalancerNotFoundException:
+				err = util.CreateError{
+					Text: "Loadbalancer not found",
+					Err:  aerr,
+				}
+			case elbv2.ErrCodeUnsupportedProtocolException:
+				err = util.CreateError{
+					Text: "Unsupported protocol",
+					Err:  aerr,
+				}
+			}
+		}
+		return
+	}
+
+	for _, listener := range result.Listeners {
+		if *listener.Port != 443 {
+			continue
+		}
+		if aws.StringValue(listener.Protocol) != "HTTPS" {
+			continue
+		}
+		l = append(l, Listener{
+			ARN: aws.StringValue(listener.ListenerArn),
+			elb: elb,
+		})
 	}
 	return
 }

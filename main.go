@@ -4,11 +4,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	log "github.com/cantara/bragi"
 	cloud "github.com/cantara/nerthus/aws"
+	"github.com/cantara/nerthus/aws/loadbalancer"
 	"github.com/cantara/nerthus/crypto"
 	"github.com/cantara/nerthus/slack"
 	"github.com/gin-contrib/cors"
@@ -26,8 +29,9 @@ func loadEnv() {
 func main() {
 	loadEnv()
 	crypto.InitCrypto()
+	since := time.Now()
 
-	region := "us-west-2" //"eu-central-1"
+	region := os.Getenv("region") //"us-west-2" //"eu-central-1"
 	// Initialize a session in us-west-2 that the SDK will use to load
 	// credentials from the shared credentials file ~/.aws/credentials.
 	sess, err := session.NewSession(&aws.Config{
@@ -49,7 +53,7 @@ func main() {
 	r.Use(cors.New(config))
 	base := r.Group("/nerthus")
 
-	dash := base.Group("/dash")
+	dash := base.Group("/") //Might need to be in subdir dash
 	{
 		dash.StaticFile("/", "./frontend/public/index.html")
 		dash.StaticFile("/global.css", "./frontend/public/global.css")
@@ -58,13 +62,31 @@ func main() {
 	}
 
 	api := base.Group("")
-	auth := api.Group("", gin.BasicAuth(gin.Accounts{
-		"sindre": "pass",
-	}))
+	api.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"status":        "UP",
+			"version":       "unknown",
+			"ip":            "unknown",
+			"running_since": since,
+			"now":           time.Now(),
+		})
+	})
 
-	auth.PUT("/server/:application/*server", newAppHandler(&c))
-	auth.POST("/key", newKeyHandler())
+	username := os.Getenv("username")
+	password := os.Getenv("password")
+	if username == "" || password == "" {
+		log.Fatal("Missing user config in env file")
+	}
+
+	auth := api.Group("", gin.BasicAuth(gin.Accounts{
+		username: password,
+	}))
+	//auth.PUT("/server/:scope/*server", newServerHandler(&c))
+	auth.PUT("/server/:scope/:server", newServerInScopeHandler(&c))
+	auth.PUT("/service/:scope/:server", newServiceOnServerHandler(&c))
+	auth.POST("/key", newKeyHandler(&c))
 	auth.POST("/keyCrypt", newKeyCryptHandler())
+	auth.GET("/loadbalancers", newLoadbalancerHandler(&c))
 
 	/*
 		serverName := "devtest-entraos-notification3"
@@ -74,7 +96,7 @@ func main() {
 		elbSecurityGroupId := "sg-1325864d"
 	*/
 
-	r.Run(":3030")
+	r.Run(":" + os.Getenv("port"))
 }
 
 func lateExecuteDeletersWithErrorLogging(object, logMessage string, f func(...string) error, values ...string) func() {
@@ -100,7 +122,7 @@ func newKeyCryptHandler() func(*gin.Context) {
 			return
 		}
 		c.Request.Body.Close()
-		pk, err := crypto.Encrypt(string(key))
+		pk, err := crypto.Encrypt(key)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"message": "Unable to Encrypt key",
@@ -119,7 +141,7 @@ type keyBody struct {
 	Key string `form:"key" json:"key" xml:"key" binding:"required"`
 }
 
-func newKeyHandler() func(*gin.Context) {
+func newKeyHandler(cld *cloud.AWS) func(*gin.Context) {
 	return func(c *gin.Context) {
 		var body keyBody
 		err := c.ShouldBind(&body)
@@ -130,7 +152,7 @@ func newKeyHandler() func(*gin.Context) {
 			})
 			return
 		}
-		pk, err := crypto.Decrypt(body.Data)
+		scope, _, k, sg, err := cloud.Decrypt(body.Key, cld)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"message": "Unable to decrypt key",
@@ -139,36 +161,49 @@ func newKeyHandler() func(*gin.Context) {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{
-			"message": "Dekoded key successfully",
-			"data":    pk,
+			"message":        "Dekoded key successfully",
+			"scope":          scope,
+			"key":            k,
+			"security_group": sg,
 		})
 	}
 }
 
-type application struct {
-	Port             int    `form:"port" json:"port" xml:"port" binding:"required"`
-	Path             string `form:"path" json:"path" xml:"path" binding:"required"`
-	ELBListenerArn   string `form:"elb_listener_arn" json:"elb_listener_arn" xml:"elb_listener_arn" binding:"required"`
-	ELBSecurityGroup string `form:"elb_securitygroup_id" json:"elb_securitygroup_id" xml:"elb_securitygroup_id"`
-	Key              string `form:"key" json:"key" xml:"key"`
+func newLoadbalancerHandler(cld *cloud.AWS) func(*gin.Context) {
+	return func(c *gin.Context) {
+		loadbalancers, err := loadbalancer.GetLoadbalancers(cld.GetELB())
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"message": "Something wend wrong while gettign loadbalancers",
+			})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"message":       "Success",
+			"loadbalancers": loadbalancers,
+		})
+	}
 }
 
-func newAppHandler(cld *cloud.AWS) func(*gin.Context) {
+type scopeReq struct {
+	Key       string            `form:"key" json:"key" xml:"key"`
+	Service   cloud.Service     `form:"service" json:"service" xml:"service" binding:"required"`
+	ISpesProp map[string]string `form:"instance_specific_propperties" json:"instance_specific_propperties" xml:"instance_specific_propperties"`
+}
+
+func newServerInScopeHandler(cld *cloud.AWS) func(*gin.Context) {
 	return func(c *gin.Context) {
-		appName := c.Param("application")
-		server := c.Param("server")[1:]
-		if len(server) == 0 {
-			server = appName
-		}
-		if err := cloud.CheckNameLen(server); err != nil {
+		scope := c.Param("scope")
+		server := c.Param("server") //[1:]
+		if err := cloud.CheckNameLen(scope); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
-				"message": fmt.Sprintf("Server name is limited by length"),
+				"message": fmt.Sprintf("Scope name is limited by length"),
 				"error":   err.Error(),
 			})
 			return
 		}
-		var app application
-		err := c.ShouldBind(&app)
+		var req scopeReq
+		err := c.ShouldBind(&req)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"message": "Unable to get requred data from request. Supported formats are: JSON, XML and HTML form",
@@ -176,7 +211,81 @@ func newAppHandler(cld *cloud.AWS) func(*gin.Context) {
 			})
 			return
 		}
-		cld.CreateFromScratch(appName, app.Path, app.Port, app.ELBListenerArn, app.ELBSecurityGroup)
+		log.Println(req.Key)
+		if req.Key == "" {
+			crypData := cld.CreateNewServerInScope(scope, server, req.Service)
+			if crypData == "" {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"message": "Something wend wrong while creating server",
+				})
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{
+				"message": "Server successfully created",
+				"key":     crypData,
+			})
+			return
+		}
+		cryptScope, v, k, sg, err := cloud.Decrypt(req.Key, cld)
+		if err != nil {
+			log.AddError(err).Fatal("While dekrypting cryptdata")
+		}
+		log.Println("Decrypted key")
+		if cryptScope != scope {
+			log.Fatal("Scope in cryptodata and provided scope are different")
+		}
+		crypData := cld.AddNewServerToScope(scope, server, v, k, sg, req.Service)
+		if crypData == "" {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"message": "Something wend wrong while creating server",
+			})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Server successfully created",
+			"key":     crypData,
+		})
+	}
+}
+
+func newServiceOnServerHandler(cld *cloud.AWS) func(*gin.Context) {
+	return func(c *gin.Context) {
+		scope := c.Param("scope")
+		server := c.Param("server") //[1:]
+		if err := cloud.CheckNameLen(scope); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"message": fmt.Sprintf("Scope name is limited by length"),
+				"error":   err.Error(),
+			})
+			return
+		}
+		var req scopeReq
+		err := c.ShouldBind(&req)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"message": "Unable to get requred data from request. Supported formats are: JSON, XML and HTML form",
+				"error":   err.Error(),
+			})
+			return
+		}
+		cryptScope, _, k, sg, err := cloud.Decrypt(req.Key, cld)
+		if err != nil {
+			log.AddError(err).Fatal("While dekrypting cryptdata")
+		}
+		if cryptScope != scope {
+			log.Fatal("Scope in cryptodata and provided scope are different")
+		}
+		crypData := cld.AddServiceToServer(scope, server, k, sg, req.Service)
+		if crypData == "" {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"message": "Something wend wrong while creating server",
+			})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Server successfully created",
+			"key":     crypData,
+		})
 	}
 }
 
@@ -222,3 +331,32 @@ func (s Stack) First() func() {
 func (s Stack) Empty() bool {
 	return s.Len() == 0
 }
+
+/*
+func newServerHandler(cld *cloud.AWS) func(*gin.Context) {
+	return func(c *gin.Context) {
+		scope := c.Param("scope")
+		server := c.Param("server")[1:]
+		if err := cloud.CheckNameLen(server); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"message": fmt.Sprintf("Server name is limited by length"),
+				"error":   err.Error(),
+			})
+			return
+		}
+		var req scopeReq
+		err := c.ShouldBind(&req)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"message": "Unable to get requred data from request. Supported formats are: JSON, XML and HTML form",
+				"error":   err.Error(),
+			})
+			return
+		}
+		/*
+			cld.CreateNewServerInScope() // With neither key nor server
+			cld.AddNewServiceToServer()  // With key and server
+			cld.AddNewServerToScope()    // With only key
+	}
+}
+*/

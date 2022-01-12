@@ -9,7 +9,7 @@ import (
 )
 
 type VPC struct {
-	Id string
+	Id string `json:"id"`
 }
 
 func GetVPC(e2 *ec2.EC2) (vpc VPC, err error) {
