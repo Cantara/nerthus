@@ -1,7 +1,7 @@
 package server
 
 import (
-	"io/ioutil"
+	"embed"
 	"strconv"
 	"strings"
 
@@ -33,8 +33,12 @@ func NewService(name, updateProp, localOverride, healthReport, path string, port
 	return
 }
 
+//go:embed new_service.sh
+var f embed.FS
+
 func (s *Service) Create() (id string, err error) {
-	script, err := ioutil.ReadFile("./new_devtest_server.sh")
+
+	script, err := f.ReadFile("new_service.sh")
 	if err != nil {
 		log.AddError(err).Warning("While reading in base script")
 		return
