@@ -268,14 +268,14 @@ func newServiceOnServerHandler(cld *cloud.AWS) func(*gin.Context) {
 			})
 			return
 		}
-		cryptScope, _, k, sg, err := cloud.Decrypt(req.Key, cld)
+		cryptScope, v, k, sg, err := cloud.Decrypt(req.Key, cld)
 		if err != nil {
 			log.AddError(err).Fatal("While dekrypting cryptdata")
 		}
 		if cryptScope != scope {
 			log.Fatal("Scope in cryptodata and provided scope are different")
 		}
-		crypData := cld.AddServiceToServer(scope, server, k, sg, req.Service)
+		crypData := cld.AddServiceToServer(scope, server, v, k, sg, req.Service)
 		if crypData == "" {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"message": "Something wend wrong while creating server",

@@ -33,7 +33,7 @@ type Service struct {
 	Key              string `form:"key" json:"key" xml:"key"`
 }
 
-func (c AWS) AddServiceToServer(scope, serverName string, k key.Key, sg security.Group, service Service) (cryptData string) {
+func (c AWS) AddServiceToServer(scope, serverName string, v vpclib.VPC, k key.Key, sg security.Group, service Service) (cryptData string) {
 	seq := sequence{
 		ec2:           c.ec2,
 		elb:           c.elb,
@@ -41,6 +41,7 @@ func (c AWS) AddServiceToServer(scope, serverName string, k key.Key, sg security
 		deleters:      NewStack(),
 		scope:         scope,
 		service:       service,
+		vpc:           v,
 		key:           k,
 		securityGroup: sg,
 	}
