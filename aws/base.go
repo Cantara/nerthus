@@ -67,7 +67,7 @@ func (a AWS) hasELBSession() error {
 
 func cleanup(object, logMessage string, obj util.AWSObject) func() {
 	return func() {
-		s := fmt.Sprintf("Cleaning up: %s", object)
+		s := fmt.Sprintf(":ghost: Cleaning up: %s", object)
 		log.Info(s)
 		slack.SendStatus(s)
 		err := obj.Delete()
