@@ -39,9 +39,9 @@ ln -s scripts/CRON CRON
 
 crontab ~/CRON
 
-curl --fail --show-error --silent -o "buri-v0.3.0" "https://mvnrepo.cantara.no/content/repositories/releases/no/cantara/gotools/buri/v0.3.0/buri-v0.3.0"
-chmod +x "buri-v0.3.0"
-ln -s "buri-v0.3.0" "buri"
+curl --fail --show-error --silent -o "buri-v0.3.5" "https://mvnrepo.cantara.no/content/repositories/releases/no/cantara/gotools/buri/v0.3.5/buri-v0.3.5"
+ln -s "buri-v0.3.5" "buri"
+chmod +x "buri"
 
 cat <<'EOF' > ~/scripts/start-vili.sh
 #!/bin/sh
