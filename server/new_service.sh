@@ -30,8 +30,8 @@ EOF
 cat <<'EOF' > ~/scripts/CRON
 MAILTO=""
 */6 * * * * ./scripts/semantic_update_service.sh > /dev/null
-*/6 * * * * ./buri -a buri -g no/cantara/buri > /dev/null
-*/6 * * * * ./buri -a vili -g no/cantara/vili -r > /dev/null
+*/6 * * * * ./buri -a buri -g no/cantara/gotools > /dev/null
+*/6 * * * * ./buri -a vili -g no/cantara/gotools -r > /dev/null
 * * * * * ./scripts/reportServiceHealthToVisuale.sh > /dev/null
 EOF
 
@@ -39,9 +39,9 @@ ln -s scripts/CRON CRON
 
 crontab ~/CRON
 
-curl --fail --show-error --silent -o "buri-v0.2.0" "https://mvnrepo.cantara.no/content/repositories/releases/no/cantara/buri/buri/v0.2.0/buri-v0.2.0"
-chmod +x "buri-v0.2.0"
-ln -s "buri-v0.2.0" "buri"
+curl --fail --show-error --silent -o "buri-v0.3.0" "https://mvnrepo.cantara.no/content/repositories/releases/no/cantara/gotools/buri/v0.3.0/buri-v0.3.0"
+chmod +x "buri-v0.3.0"
+ln -s "buri-v0.3.0" "buri"
 
 cat <<'EOF' > ~/scripts/start-vili.sh
 #!/bin/sh
