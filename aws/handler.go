@@ -190,12 +190,12 @@ func (c *sequence) Cleanup() {
 	}
 	log.Info("Cleanup started.")
 	c.cryptData = ""
-	slack.SendStatus("Something went wrong starting cleanup.")
+	slack.SendStatus(":ghost: Something went wrong starting cleanup.")
 	for delFunc := c.deleters.Pop(); delFunc != nil; delFunc = c.deleters.Pop() {
 		delFunc()
 	}
 	log.Info("Cleanup is \"done\", exiting.")
-	slack.SendStatus("Cleanup is \"done\".")
+	slack.SendStatus(":ghost: Cleanup is \"done\".")
 }
 
 func (c sequence) CheckServerName(name string) {
@@ -209,7 +209,7 @@ func (c sequence) CheckServerName(name string) {
 }
 
 func (c sequence) StartingServerSettup() {
-	s := fmt.Sprintf("Starting to settyp server %s in aws.", c.scope)
+	s := fmt.Sprintf(":ghost: Starting to settyp server %s in aws.", c.scope)
 	log.Info(s)
 	slack.SendStatus(s)
 }
@@ -222,7 +222,7 @@ func (c *sequence) CreateKey() {
 		log.AddError(err).Fatal("While creating keypair")
 	}
 	c.deleters.Push(cleanup("Key pair", "while deleting created key pair", &key))
-	s := fmt.Sprintf("Created key pair %s %s", key.Name, key.Fingerprint)
+	s := fmt.Sprintf(":ghost: Created key pair %s %s", key.Name, key.Fingerprint)
 	log.Info(s)
 	slack.SendStatus(s)
 	pem, err := os.OpenFile("./"+key.PemName, os.O_WRONLY|os.O_CREATE, 0600)
@@ -240,7 +240,7 @@ func (c *sequence) GetVPC() {
 	if err != nil {
 		log.AddError(err).Fatal("While getting vpcId")
 	}
-	s := fmt.Sprintf("Found VPCId: %s.", vpc.Id)
+	s := fmt.Sprintf(":ghost: Found VPCId: %s.", vpc.Id)
 	log.Info(s)
 	slack.SendStatus(s)
 	c.vpc = vpc
@@ -254,7 +254,7 @@ func (c *sequence) CreateSecurityGroup() {
 	}
 	c.deleters.Push(cleanup("Security group", "while deleting created security group",
 		&securityGroup))
-	s := fmt.Sprintf("Created security group %s with VPC %s.",
+	s := fmt.Sprintf(":ghost: Created security group %s with VPC %s.",
 		securityGroup.Id, c.vpc.Id)
 	log.Info(s)
 	slack.SendStatus(s)
@@ -267,7 +267,7 @@ func (c *sequence) AddBaseAuthorizationToSecurityGroup() {
 	if err != nil {
 		log.AddError(err).Fatal("Could not add base authorization")
 	}
-	s := fmt.Sprintf("Added base authorization to security group: %s.", c.securityGroup.Id)
+	s := fmt.Sprintf(":ghost: Added base authorization to security group: %s.", c.securityGroup.Id)
 	log.Info(s)
 	slack.SendStatus(s)
 }
@@ -279,7 +279,7 @@ func (c *sequence) CreateNewServer(serverName string) {
 		log.Fatal("Could not create server", err)
 	}
 	c.deleters.Push(cleanup("Server", "while deleting created server", &server))
-	s := fmt.Sprintf("Created server: %s.", server.Id)
+	s := fmt.Sprintf(":ghost: Created server: %s.", server.Id)
 	log.Info(s)
 	slack.SendStatus(s)
 	c.server = server
@@ -294,7 +294,7 @@ func (c *sequence) WaitForServerToStart() {
 	if err != nil {
 		log.AddError(err).Fatal("While getting public dns name")
 	}
-	s = fmt.Sprintf("Got server %s's public dns %s.", c.server.Id, c.server.PublicDNS)
+	s = fmt.Sprintf(":ghost: Got server %s's public dns %s.", c.server.Id, c.server.PublicDNS)
 	log.Info(s)
 	slack.SendStatus(s)
 }
@@ -306,7 +306,7 @@ func (c *sequence) CreateTargetGroup() {
 		log.AddError(err).Fatal(fmt.Sprintf("While creating target group for %s", c.server.Name))
 	}
 	c.deleters.Push(cleanup("Target group", "while deleting created target group", &targetGroup))
-	s := fmt.Sprintf("Created target group: %s.", targetGroup.ARN)
+	s := fmt.Sprintf(":ghost: Created target group: %s.", targetGroup.ARN)
 	log.Info(s)
 	slack.SendStatus(s)
 	c.targetGroup = targetGroup
@@ -317,7 +317,7 @@ func (c *sequence) GetTargetGroup() {
 	if err != nil {
 		log.AddError(err).Fatal(fmt.Sprintf("While getting target group for %s", c.server.Name))
 	}
-	s := fmt.Sprintf("Got target group: %s.", targetGroup.ARN)
+	s := fmt.Sprintf(":ghost: Got target group: %s.", targetGroup.ARN)
 	log.Info(s)
 	slack.SendStatus(s)
 	c.targetGroup = targetGroup
@@ -330,7 +330,7 @@ func (c *sequence) CreateTarget() {
 		log.AddError(err).Fatal(fmt.Sprintf("While adding target to target group %s", c.targetGroup.ARN))
 	}
 	c.deleters.Push(cleanup("Target in targetgroup", "while removing registered target from targetgroup", &target))
-	s := fmt.Sprintf("Registered server %s as target for target group %s.", c.server.Id, c.targetGroup.ARN)
+	s := fmt.Sprintf(":ghost: Registered server %s as target for target group %s.", c.server.Id, c.targetGroup.ARN)
 	log.Info(s)
 	slack.SendStatus(s)
 }
@@ -343,7 +343,7 @@ func (c *sequence) AddRuleToListener() {
 		log.AddError(err).Fatal(fmt.Sprintf("While adding rule to elb %s", listener.ARN))
 	}
 	c.deleters.Push(cleanup("Rule", "while removing rule added to loadbalancer", &rule))
-	s := fmt.Sprintf("Adding elastic load balancer rule: %s.", rule.ARN)
+	s := fmt.Sprintf(":ghost: Adding elastic load balancer rule: %s.", rule.ARN)
 	log.Info(s)
 	slack.SendStatus(s)
 	c.rule = rule
@@ -366,7 +366,7 @@ func (c *sequence) TagNewService() {
 		log.AddError(err).Fatal(fmt.Sprintf("While tagging new service %s", c.service.ArtifactId))
 	}
 	c.deleters.Push(cleanup("Tag", "while removing tag added to all resources used by service", &t))
-	s := fmt.Sprintf("Adding tag to all resources used by service: %s.", c.service.ArtifactId)
+	s := fmt.Sprintf(":ghost: Adding tag to all resources used by service: %s.", c.service.ArtifactId)
 	log.Info(s)
 	slack.SendStatus(s)
 }
@@ -382,7 +382,7 @@ func (c *sequence) TagAdditionalServer() {
 		log.AddError(err).Fatal(fmt.Sprintf("While tagging additional service %s", c.service.ArtifactId))
 	}
 	c.deleters.Push(cleanup("Tag", "while removing tag added to resources used by the additional service", &t))
-	s := fmt.Sprintf("Adding tag to resources used by additional service: %s.", c.service.ArtifactId)
+	s := fmt.Sprintf(":ghost: Adding tag to resources used by additional service: %s.", c.service.ArtifactId)
 	log.Info(s)
 	slack.SendStatus(s)
 }
@@ -394,18 +394,18 @@ func (c sequence) DoneSettingUpServer() {
 }
 
 func (c sequence) WaitForELBRuleToBeHealthy() {
-	s := fmt.Sprintf("Started waiting for elb rule to be healthy %s.", c.rule.ARN)
+	s := fmt.Sprintf(":ghost: Started waiting for elb rule to be healthy %s.", c.rule.ARN)
 	log.Info(s)
 	slack.SendStatus(s)
 	time.Sleep(30 * time.Second)
-	s = fmt.Sprintf("Done waiting for elb rule to be healthy %s.", c.rule.ARN)
+	s = fmt.Sprintf(":ghost: Done waiting for elb rule to be healthy %s.", c.rule.ARN)
 	log.Info(s)
 	slack.SendStatus(s)
 }
 
 func (c sequence) StartingServiceInstallation() {
 	time.Sleep(time.Second * 30)
-	s := fmt.Sprintf("Starting to install stuff on server %s.", c.server.PublicDNS)
+	s := fmt.Sprintf(":ghost: Starting to install stuff on server %s.", c.server.PublicDNS)
 	log.Info(s)
 	slack.SendStatus(s)
 }
@@ -415,7 +415,7 @@ func (c sequence) UpdateServer() {
 	if err != nil {
 		log.AddError(err).Fatal(fmt.Sprintf("While updatating %s", c.server.PublicDNS))
 	}
-	s := fmt.Sprintf("Updated server %s.", c.server.PublicDNS)
+	s := fmt.Sprintf(":ghost: Updated server %s.", c.server.PublicDNS)
 	log.Info(s)
 	slack.SendStatus(s)
 }
@@ -427,7 +427,7 @@ func (c *sequence) InstallPrograms() {
 		log.AddError(err).Fatal(fmt.Sprintf("While verifying or installing java %s", servershlib.JAVA_ONE_ELEVEN))
 	}
 	c.deleters.Push(cleanup("Java from server", "while removing java if it was installed", &java))
-	s := fmt.Sprintf("Verified or installed java %s.", servershlib.JAVA_ONE_ELEVEN)
+	s := fmt.Sprintf(":ghost: Verified or installed java %s.", servershlib.JAVA_ONE_ELEVEN)
 	log.Info(s)
 	slack.SendStatus(s)
 }
@@ -439,7 +439,7 @@ func (c *sequence) AddUser() {
 		log.AddError(err).Fatal(fmt.Sprintf("While adding user %s", user.Name))
 	}
 	c.deleters.Push(cleanup("User from server", "while removing user from server", &user))
-	s := fmt.Sprintf("Added user %s.", user.Name)
+	s := fmt.Sprintf(":ghost: Added user %s.", user.Name)
 	log.Info(s)
 	slack.SendStatus(s)
 	c.user = user
@@ -452,7 +452,7 @@ func (c *sequence) InstallService() {
 		log.AddError(err).Fatal("While setting up service in user")
 	}
 	c.deleters.Push(cleanup("Service installed on server", "while stopping service", &service))
-	s := fmt.Sprintf("Done installing service on server %s.", c.server.PublicDNS)
+	s := fmt.Sprintf(":ghost: Done installing service on server %s.", c.server.PublicDNS)
 	log.Info(s)
 	slack.SendStatus(s)
 }
@@ -466,7 +466,7 @@ func (c *sequence) InstallFilebeat() {
 	}
 	//c.deleters.Push(cleanup("Filebeat config", "while removing filebeat config", &filebeat))
 	c.deleters.Push(cleanup("Filebeat from server", "while removing filebeat from server", &filebeat))
-	s := fmt.Sprintf("Done installing filebeat on server %s.", c.server.PublicDNS)
+	s := fmt.Sprintf(":ghost: Done installing filebeat on server %s.", c.server.PublicDNS)
 	log.Info(s)
 	slack.SendStatus(s)
 }
@@ -477,7 +477,7 @@ func (c *sequence) SendCertLogin() {
 		log.AddError(err).Fatal("While encrypting data to send to slack")
 	}
 	c.cryptData = encrypted
-	err = slack.SendServer(fmt.Sprintf("`ssh ec2-user@%s -i %s`\n%s\n```%s```", c.server.PublicDNS, c.key.PemName, c.service.ArtifactId, encrypted))
+	err = slack.SendServer(fmt.Sprintf(":ghost: `ssh ec2-user@%s -i %s`\n%s\n```%s```", c.server.PublicDNS, c.key.PemName, c.service.ArtifactId, encrypted))
 	if err != nil {
 		log.AddError(err).Fatal("While sending encrypted cert and login to slack")
 	}
