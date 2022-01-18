@@ -85,7 +85,7 @@ func (r *Rule) Create() (id string, err error) {
 	if err != nil {
 		return
 	}
-	numRules, err := r.listener.GetNumRules()
+	highestPriority, err := r.listener.GetHighestPriority()
 	if err != nil {
 		return
 	}
@@ -106,7 +106,7 @@ func (r *Rule) Create() (id string, err error) {
 			},
 		},
 		ListenerArn: aws.String(r.listener.ARN),
-		Priority:    aws.Int64(int64(numRules)),
+		Priority:    aws.Int64(int64(highestPriority + 1)),
 	}
 
 	result, err := r.elb.CreateRule(input)
