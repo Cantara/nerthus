@@ -25,6 +25,7 @@ type TargetGroup struct {
 func createTargetGroupName(scope, name string) (string, error) {
 	tgName := strings.Split(scope, "-")[0] + "-" + strings.ToLower(name)
 	tgName = strings.TrimSuffix(tgName, "api")
+	tgName = strings.ReplaceAll(tgName, "-", " ")
 	tgName = strings.TrimSpace(tgName)
 	tgName = strings.ReplaceAll(tgName, " ", "-")
 	tgName = tgName + "-tg"
