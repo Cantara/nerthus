@@ -62,7 +62,7 @@ cat <<'EOF' > ~/.env
 port="<port>"
 scheme="http"
 endpoint="localhost"
-port_range="9500-9600"
+port_range="<port_from>-<port_to>"
 identifier="<application>"
 log_dir="logs_vili"
 properties_file_name="local_override.properties"
