@@ -14,7 +14,7 @@ type Service struct {
 	LocalOverride string
 	HealthReport  string
 	Path          string
-	Port          string
+	Port          int
 	user          User
 	serv          Server
 }
@@ -26,7 +26,7 @@ func NewService(name, updateProp, localOverride, healthReport, path string, port
 		LocalOverride: localOverride,
 		HealthReport:  healthReport,
 		Path:          path,
-		Port:          strconv.Itoa(port),
+		Port:          port,
 		user:          user,
 		serv:          serv,
 	}
@@ -47,9 +47,9 @@ func (s *Service) Create() (id string, err error) {
 	scripts = strings.ReplaceAll(scripts, "<username>", s.user.Name)
 	scripts = strings.ReplaceAll(scripts, "<semantic_update_service_properties>", s.UpdateProp)
 	scripts = strings.ReplaceAll(scripts, "<local_override_properties>", s.LocalOverride)
-	scripts = strings.ReplaceAll(scripts, "<port>", s.Port)
-	scripts = strings.ReplaceAll(scripts, "<port_from>", s.Port+1)
-	scripts = strings.ReplaceAll(scripts, "<port_to>", s.Port+10)
+	scripts = strings.ReplaceAll(scripts, "<port>", strconv.Itoa(s.Port))
+	scripts = strings.ReplaceAll(scripts, "<port_from>", strconv.Itoa(s.Port+1))
+	scripts = strings.ReplaceAll(scripts, "<port_to>", strconv.Itoa(s.Port+10))
 	scripts = strings.ReplaceAll(scripts, "<path>", s.Path)
 	scripts = strings.ReplaceAll(scripts, "<health_report_enpoint>", s.HealthReport)
 	_, err = s.serv.RunScript(scripts)
