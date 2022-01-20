@@ -48,14 +48,23 @@ pipeline {
                     echo "deploying version ${vers}"
                     if (release) {
                         sh 'curl -v -u $NEXUS_CREDS '+"--upload-file ${outFile} https://mvnrepo.cantara.no/content/repositories/releases/no/cantara/gotools/nerthus/${vers}/${outFile}"
-                        sh 'find frontend/public -type f -exec curl -v -u $NEXUS_CREDS '+"--upload-file frontend/public/{} https://mvnrepo.cantara.no/content/repositories/releases/no/cantara/gotools/nerthus/${vers}/frontend/{}"
-                        sh 'find frontend/public/build -type f -exec curl -v -u $NEXUS_CREDS '+"--upload-file frontend/public/{} https://mvnrepo.cantara.no/content/repositories/releases/no/cantara/gotools/nerthus/${vers}/frontend/build/{}"
+                        sh 'curl -v -u $NEXUS_CREDS '+"--upload-file frontend/public/index.html https://mvnrepo.cantara.no/content/repositories/releases/no/cantara/gotools/nerthus/${vers}/frontend/index.html"
+                        sh 'curl -v -u $NEXUS_CREDS '+"--upload-file frontend/public/global.css https://mvnrepo.cantara.no/content/repositories/releases/no/cantara/gotools/nerthus/${vers}/frontend/global.css"
+                        sh 'curl -v -u $NEXUS_CREDS '+"--upload-file frontend/public/favicon.png https://mvnrepo.cantara.no/content/repositories/releases/no/cantara/gotools/nerthus/${vers}/frontend/favicon.png"
+                        sh 'curl -v -u $NEXUS_CREDS '+"--upload-file frontend/public/build/bundle.js https://mvnrepo.cantara.no/content/repositories/releases/no/cantara/gotools/nerthus/${vers}/frontend/build/bundle.js"
+                        sh 'curl -v -u $NEXUS_CREDS '+"--upload-file frontend/public/build/bundle.js.map https://mvnrepo.cantara.no/content/repositories/releases/no/cantara/gotools/nerthus/${vers}/frontend/build/bundle.js.map"
+                        sh 'curl -v -u $NEXUS_CREDS '+"--upload-file frontend/public/build/bundle.css https://mvnrepo.cantara.no/content/repositories/releases/no/cantara/gotools/nerthus/${vers}/frontend/build/bundle.css"
                     } else {
                         sh 'curl -v -u $NEXUS_CREDS '+"--upload-file ${outFile} https://mvnrepo.cantara.no/content/repositories/snapshots/no/cantara/gotools/nerthus/${vers}/${outFile}"
-                        sh 'find frontend/public -type f -exec curl -v -u $NEXUS_CREDS '+"--upload-file frontend/public/{} https://mvnrepo.cantara.no/content/repositories/snapshots/no/cantara/gotools/nerthus/${vers}/frontend/{}"
-                        sh 'find frontend/public/build -type f -exec curl -v -u $NEXUS_CREDS '+"--upload-file frontend/public/{} https://mvnrepo.cantara.no/content/repositories/snapshots/no/cantara/gotools/nerthus/${vers}/frontend/build/{}"
+                        sh 'curl -v -u $NEXUS_CREDS '+"--upload-file frontend/public/index.html https://mvnrepo.cantara.no/content/repositories/snapshots/no/cantara/gotools/nerthus/${vers}/frontend/index.html"
+                        sh 'curl -v -u $NEXUS_CREDS '+"--upload-file frontend/public/global.css https://mvnrepo.cantara.no/content/repositories/snapshots/no/cantara/gotools/nerthus/${vers}/frontend/global.css"
+                        sh 'curl -v -u $NEXUS_CREDS '+"--upload-file frontend/public/favicon.png https://mvnrepo.cantara.no/content/repositories/snapshots/no/cantara/gotools/nerthus/${vers}/frontend/favicon.png"
+                        sh 'curl -v -u $NEXUS_CREDS '+"--upload-file frontend/public/build/bundle.js https://mvnrepo.cantara.no/content/repositories/snapshots/no/cantara/gotools/nerthus/${vers}/frontend/build/bundle.js"
+                        sh 'curl -v -u $NEXUS_CREDS '+"--upload-file frontend/public/build/bundle.js.map https://mvnrepo.cantara.no/content/repositories/snapshots/no/cantara/gotools/nerthus/${vers}/frontend/build/bundle.js.map"
+                        sh 'curl -v -u $NEXUS_CREDS '+"--upload-file frontend/public/build/bundle.css https://mvnrepo.cantara.no/content/repositories/snapshots/no/cantara/gotools/nerthus/${vers}/frontend/build/bundle.css"
                     }
                     sh "rm ${outFile}"
+                    sh "rm -r frontend/npm"
                 }
             }
         }
@@ -71,6 +80,6 @@ def buildApp(outFile, vers) {
     echo 'building the application...'
     sh 'ls'
     sh "CGO_ENABLED=0 GOOD=linux GOARCH=amd64 go build -ldflags \"-X 'main.Version=${vers}' -X 'main.BuildTime=\$(date)'\" -o ${outFile}"
-    sh 'mvn compile'
+    sh 'cd frontend && mvn compile'
     sh 'ls'
 }
