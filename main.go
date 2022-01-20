@@ -19,6 +19,10 @@ import (
 	"github.com/joho/godotenv"
 )
 
+var Version string
+
+var BuildTime string
+
 func loadEnv() {
 	err := godotenv.Load(".env")
 	if err != nil {
@@ -65,7 +69,8 @@ func main() {
 	api.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"status":        "UP",
-			"version":       "unknown",
+			"version":       Version,
+			"build_time":    BuildTime,
 			"ip":            "unknown",
 			"running_since": since,
 			"now":           time.Now(),

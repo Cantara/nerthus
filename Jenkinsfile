@@ -36,7 +36,7 @@ pipeline {
                 script {
                     echo "V: ${vers}"
                     echo "File: ${outFile}"
-                    buildApp(outFile)
+                    buildApp(outFile, vers)
                 }
             }
         }
@@ -62,9 +62,9 @@ def testApp() {
     sh './testRecursive.sh'
 }
 
-def buildApp(outFile) {
+def buildApp(outFile, vers) {
     echo 'building the application...'
     sh 'ls'
-    sh "CGO_ENABLED=0 GOOD=linux GOARCH=amd64 go build -o ${outFile}"
+    sh "CGO_ENABLED=0 GOOD=linux GOARCH=amd64 go build -ldflags "-X 'main.Version=$(vers)' -X 'main.BuildTime=$(date)'" -o ${outFile}"
     sh 'ls'
 }
