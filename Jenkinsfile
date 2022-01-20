@@ -47,8 +47,10 @@ pipeline {
                     echo "deploying version ${vers}"
                     if (release) {
                         sh 'curl -v -u $NEXUS_CREDS '+"--upload-file ${outFile} https://mvnrepo.cantara.no/content/repositories/releases/no/cantara/gotools/nerthus/${vers}/${outFile}"
+                        sh 'curl -v -u $NEXUS_CREDS '+"--upload-file frontend/public https://mvnrepo.cantara.no/content/repositories/releases/no/cantara/gotools/nerthus/${vers}/frontend"
                     } else {
                         sh 'curl -v -u $NEXUS_CREDS '+"--upload-file ${outFile} https://mvnrepo.cantara.no/content/repositories/snapshots/no/cantara/gotools/nerthus/${vers}/${outFile}"
+                        sh 'curl -v -u $NEXUS_CREDS '+"--upload-file frontend/public https://mvnrepo.cantara.no/content/repositories/snapshots/no/cantara/gotools/nerthus/${vers}/frontend"
                     }
                     sh "rm ${outFile}"
                 }
@@ -66,5 +68,6 @@ def buildApp(outFile, vers) {
     echo 'building the application...'
     sh 'ls'
     sh "CGO_ENABLED=0 GOOD=linux GOARCH=amd64 go build -ldflags \"-X 'main.Version=${vers}' -X 'main.BuildTime=\$(date)'\" -o ${outFile}"
+    sh 'mvn compile'
     sh 'ls'
 }

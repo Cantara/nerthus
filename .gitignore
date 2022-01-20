@@ -29,3 +29,4 @@ nerthus
 *.pem
 # Temp adding this file until it no longer has secrets in it
 *.sh
+frontend/npm
