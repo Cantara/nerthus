@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"os"
 	"time"
@@ -28,6 +29,18 @@ func loadEnv() {
 	if err != nil {
 		log.Fatalf("Error loading .env file: %s", err)
 	}
+}
+
+func GetOutboundIP() net.IP {
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+
+	return localAddr.IP
 }
 
 func main() {
@@ -65,13 +78,14 @@ func main() {
 		dash.StaticFS("/build", http.Dir("./frontend/public/build"))
 	}
 
+	outboudIp := GetOutboundIP()
 	api := base.Group("")
 	api.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"status":        "UP",
 			"version":       Version,
 			"build_time":    BuildTime,
-			"ip":            "unknown",
+			"ip":            outboudIp.String(),
 			"running_since": since,
 			"now":           time.Now(),
 		})
