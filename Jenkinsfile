@@ -5,6 +5,7 @@ pipeline {
     agent any
     tools {
         go 'Go 1.17'
+        maven 'mvn'
     }
     environment {
         NEXUS_CREDS = credentials('Cantara-NEXUS')
@@ -47,10 +48,12 @@ pipeline {
                     echo "deploying version ${vers}"
                     if (release) {
                         sh 'curl -v -u $NEXUS_CREDS '+"--upload-file ${outFile} https://mvnrepo.cantara.no/content/repositories/releases/no/cantara/gotools/nerthus/${vers}/${outFile}"
-                        sh 'curl -v -u $NEXUS_CREDS '+"--upload-file frontend/public https://mvnrepo.cantara.no/content/repositories/releases/no/cantara/gotools/nerthus/${vers}/frontend"
+                        sh 'find frontend/public -type f -exec curl -v -u $NEXUS_CREDS '+"--upload-file frontend/public/{} https://mvnrepo.cantara.no/content/repositories/releases/no/cantara/gotools/nerthus/${vers}/frontend/{}"
+                        sh 'find frontend/public/build -type f -exec curl -v -u $NEXUS_CREDS '+"--upload-file frontend/public/{} https://mvnrepo.cantara.no/content/repositories/releases/no/cantara/gotools/nerthus/${vers}/frontend/build/{}"
                     } else {
                         sh 'curl -v -u $NEXUS_CREDS '+"--upload-file ${outFile} https://mvnrepo.cantara.no/content/repositories/snapshots/no/cantara/gotools/nerthus/${vers}/${outFile}"
-                        sh 'curl -v -u $NEXUS_CREDS '+"--upload-file frontend/public https://mvnrepo.cantara.no/content/repositories/snapshots/no/cantara/gotools/nerthus/${vers}/frontend"
+                        sh 'find frontend/public -type f -exec curl -v -u $NEXUS_CREDS '+"--upload-file frontend/public/{} https://mvnrepo.cantara.no/content/repositories/snapshots/no/cantara/gotools/nerthus/${vers}/frontend/{}"
+                        sh 'find frontend/public/build -type f -exec curl -v -u $NEXUS_CREDS '+"--upload-file frontend/public/{} https://mvnrepo.cantara.no/content/repositories/snapshots/no/cantara/gotools/nerthus/${vers}/frontend/build/{}"
                     }
                     sh "rm ${outFile}"
                 }
