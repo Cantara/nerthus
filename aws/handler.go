@@ -28,7 +28,7 @@ type Service struct {
 	UpdateProp       string `form:"semantic_update_service_properties" json:"semantic_update_service_properties" xml:"semantic_update_service_properties"`
 	ArtifactId       string `form:"artifact_id" json:"artifact_id" xml:"artifact_id" binding:"required"`
 	LocalOverride    string `form:"local_override_properties" json:"local_override_properties" xml:"local_override_properties"`
-	HealthReport     string `form:"health_report_enpoint" json:"health_report_enpoint" xml:"health_report_enpoint"`
+	HealthReport     string `form:"health_report_url" json:"health_report_url" xml:"health_report_url"`
 	FilebeatConf     string `form:"filebeat_configuration" json:"filebeat_configuration" xml:"filebeat_configuration"`
 	Key              string `form:"key" json:"key" xml:"key"`
 }
