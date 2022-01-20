@@ -5,7 +5,7 @@ pipeline {
     agent any
     tools {
         go 'Go 1.17'
-        maven 'mvn'
+        maven 'Mvn'
     }
     environment {
         NEXUS_CREDS = credentials('Cantara-NEXUS')
