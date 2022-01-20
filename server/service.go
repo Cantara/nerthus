@@ -2,6 +2,7 @@ package server
 
 import (
 	"embed"
+	"os"
 	"strconv"
 	"strings"
 
@@ -9,26 +10,30 @@ import (
 )
 
 type Service struct {
-	Name          string
-	UpdateProp    string
-	LocalOverride string
-	HealthReport  string
-	Path          string
-	Port          int
-	user          User
-	serv          Server
+	Name             string
+	UpdateProp       string
+	LocalOverride    string
+	HealthReport     string
+	Path             string
+	ViliWhydahId     string
+	ViliWhydahSecret string
+	Port             int
+	user             User
+	serv             Server
 }
 
 func NewService(name, updateProp, localOverride, healthReport, path string, port int, user User, serv Server) (s Service, err error) {
 	s = Service{
-		Name:          name,
-		UpdateProp:    updateProp,
-		LocalOverride: localOverride,
-		HealthReport:  healthReport,
-		Path:          path,
-		Port:          port,
-		user:          user,
-		serv:          serv,
+		Name:             name,
+		UpdateProp:       updateProp,
+		LocalOverride:    localOverride,
+		HealthReport:     healthReport,
+		Path:             path,
+		Port:             port,
+		user:             user,
+		serv:             serv,
+		ViliWhydahId:     os.Getenv("vili_whydah_application_id"),
+		ViliWhydahSecret: os.Getenv("vili_whydah_application_secret"),
 	}
 	return
 }
@@ -52,6 +57,8 @@ func (s *Service) Create() (id string, err error) {
 	scripts = strings.ReplaceAll(scripts, "<port_to>", strconv.Itoa(s.Port+10))
 	scripts = strings.ReplaceAll(scripts, "<path>", s.Path)
 	scripts = strings.ReplaceAll(scripts, "<health_report_enpoint>", s.HealthReport)
+	scripts = strings.ReplaceAll(scripts, "<whydah_application_id>", s.ViliWhydahId)
+	scripts = strings.ReplaceAll(scripts, "<whydah_application_secret>", s.ViliWhydahSecret)
 	_, err = s.serv.RunScript(scripts)
 	return
 }
