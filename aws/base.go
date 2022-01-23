@@ -10,6 +10,7 @@ import (
 	log "github.com/cantara/bragi"
 	"github.com/cantara/nerthus/aws/key"
 	"github.com/cantara/nerthus/aws/security"
+	serverlib "github.com/cantara/nerthus/aws/server"
 	"github.com/cantara/nerthus/aws/util"
 	"github.com/cantara/nerthus/aws/vpc"
 	"github.com/cantara/nerthus/crypto"
@@ -160,5 +161,14 @@ func Decrypt(dataCrypt string, a *AWS) (scope string, v vpc.VPC, k key.Key, sg s
 	sg = cd.SecurityGroup.WithEC2(a.ec2)
 	sg.Scope = scope
 	fmt.Println(cd)
+	return
+}
+
+func GetPublicDNS(server, scope string, a *AWS) (publicDNS string, err error) {
+	serv, err := serverlib.GetServer(server, scope, key.Key{}, security.Group{}, a.ec2)
+	if err != nil {
+		return
+	}
+	publicDNS = serv.PublicDNS
 	return
 }

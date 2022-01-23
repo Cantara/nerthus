@@ -106,6 +106,7 @@ func main() {
 	auth.POST("/key", newKeyHandler(&c))
 	auth.POST("/keyCrypt", newKeyCryptHandler())
 	auth.GET("/loadbalancers", newLoadbalancerHandler(&c))
+	auth.GET("/dns/:scope/:server", dnsHandler(&c))
 
 	/*
 		serverName := "devtest-entraos-notification3"
@@ -184,6 +185,25 @@ func newKeyHandler(cld *cloud.AWS) func(*gin.Context) {
 			"scope":          scope,
 			"key":            k,
 			"security_group": sg,
+		})
+	}
+}
+
+func dnsHandler(cld *cloud.AWS) func(*gin.Context) {
+	return func(c *gin.Context) {
+		scope := c.Param("scope")
+		server := c.Param("server")
+		publicDNS, err := cloud.GetPublicDNS(server, scope, cld)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"message": "Unable to find server",
+				"error":   err.Error(),
+			})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"message":    "Public DNS found",
+			"public_dns": publicDNS,
 		})
 	}
 }
