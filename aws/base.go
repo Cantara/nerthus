@@ -123,16 +123,18 @@ func (s Stack) Empty() bool {
 
 type cryptoData struct {
 	Scope         string         `json:"scope"`
+	SlackId       string         `json:"slack_id"`
 	VPC           vpc.VPC        `json:"vpc"`
 	Key           key.Key        `json:"key"`
 	SecurityGroup security.Group `json:"security_group"`
 }
 
-func Encrypt(scope string, v vpc.VPC, k key.Key, sg security.Group) (encrypted string, err error) {
+func Encrypt(scope string, v vpc.VPC, k key.Key, sg security.Group, slackId string) (encrypted string, err error) {
 	data := cryptoData{
 		VPC:           v,
 		Key:           k,
 		Scope:         scope,
+		SlackId:       slackId,
 		SecurityGroup: sg,
 	}
 	fmt.Println(data)
@@ -144,7 +146,7 @@ func Encrypt(scope string, v vpc.VPC, k key.Key, sg security.Group) (encrypted s
 	return
 }
 
-func Decrypt(dataCrypt string, a *AWS) (scope string, v vpc.VPC, k key.Key, sg security.Group, err error) {
+func Decrypt(dataCrypt string, a *AWS) (scope string, v vpc.VPC, k key.Key, sg security.Group, slackId string, err error) {
 	data, err := crypto.Decrypt(dataCrypt)
 	if err != nil {
 		return
@@ -155,6 +157,7 @@ func Decrypt(dataCrypt string, a *AWS) (scope string, v vpc.VPC, k key.Key, sg s
 		return
 	}
 	scope = cd.Scope
+	slackId = cd.SlackId
 	v = cd.VPC
 	k = cd.Key.WithEC2(a.ec2)
 	k.Scope = scope

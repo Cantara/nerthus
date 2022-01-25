@@ -4,13 +4,12 @@
   import Input from "../components/Input.svelte";
   import Select from "../components/Select.svelte";
 
-  function server() {
-    fetch('/nerthus/server/'+scope+'/'+server_name, {
+  function putScope() {
+    fetch('/nerthus/scope/'+scope, {
       method: 'PUT',
       mode: 'cors',
       cache: 'no-cache',
       credentials: 'omit',
-      body: JSON.stringify(body),
       headers: {
         'Authorization': 'Basic ' + btoa(user.name + ":" + user.password),
         'Accept': 'application/json',
@@ -32,21 +31,9 @@
     });
   }
 
-  let body = {
-    service: {
-      elb_listener_arn: "",
-      elb_securitygroup_id: "",
-      port: 0,
-      path: "",
-      artifact_id: "",
-      health_report_url: "",
-      filebeat_config_url: "",
-      local_override_properties: "",
-      semantic_update_service_properties: "",
-    },
-  }
   let scope = "";
-  let server_name = "";
+
+  let valid_scope = false;
 
   let disabled = false;
 
@@ -54,35 +41,13 @@
     name: "",
     password: "",
   }
-  export let loadbalancers = [];
-  let loadbalancer = {};
-  let loadbalancersDropdown = [];
 
-$: {
-  loadbalancersDropdown = loadbalancers.map(value => ({
-    name: value.dns_name,
-    extras: value.paths,
-    arn: value.arn,
-    listener_arn: value.listener_arn,
-    security_group: value.security_group
-  }))
-}
-$: body.service.elb_listener_arn = loadbalancer.listener_arn
-$: body.service.elb_securitygroup_id = loadbalancer.security_group
+$: disabled = !valid_scope
 </script>
 
 <h2>New scope</h2>
-<p>Use this to create a new server in a new scope with a new service</p>
+<p>Use this to create a new scope to add servers to</p>
 <form on:submit|preventDefault={() => {}}>
-  <Select required label="Loadbalancer" values={loadbalancersDropdown} bind:value={loadbalancer}/>
-  <Input required label="Scope" bind:value={scope}/>
-  <Input required label="Server name" bind:value={server_name}/>
-  <Input required number label="Port" bind:value={body.service.port}/>
-  <Input required label="Path" bind:value={body.service.path}/>
-  <Input required label="Artifact ID" bind:value={body.service.artifact_id}/>
-  <Input required label="Health report url" bind:value={body.service.health_report_url}/>
-  <Input required label="Filebeat config url" bind:value={body.service.filebeat_config_url}/>
-  <Input required multiline autogrow label="Local override properties" bind:value={body.service.local_override_properties}/>
-  <Input required multiline label="Semantic update service properties" bind:value={body.service.semantic_update_service_properties}/>
-  <Button click={server} bind:disabled>Create</Button>
+  <Input required label="Scope" bind:value={scope} bind:valid={valid_scope}/>
+  <Button click={putScope} bind:disabled>Create</Button>
 </form>

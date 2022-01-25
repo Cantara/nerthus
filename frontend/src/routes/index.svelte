@@ -5,6 +5,7 @@
   import Select from "../components/Select.svelte";
   import NewScope from "../forms/NewScope.svelte";
   import NewServer from "../forms/NewServer.svelte";
+  import NewService from "../forms/NewService.svelte";
 
   function server() {
     fetch('/nerthus/server/'+scope+'/'+server_name, {
@@ -157,45 +158,13 @@ $: body.service.elb_securitygroup_id = loadbalancer.security_group
   </div>
   <div class="new_line"/>
   <div class="item">
-    <NewScope bind:user bind:loadbalancers />
+    <NewScope bind:user />
   </div>
   <div class="item">
-    <h2>New service on server</h2>
-    <p>Use this to create a new service on an existing server</p>
-    <form on:submit|preventDefault={() => {}}>
-      <Select required label="Loadbalancer" values={loadbalancersDropdown}]} bind:value={loadbalancer}/>
-      <Input required label="Scope" bind:value={scope}/>
-      <Input required label="Server name" bind:value={server_name}/>
-      <Input required number label="Port" bind:value={body.service.port}/>
-      <Input required label="Path" bind:value={body.service.path}/>
-      <Input required label="Artifact ID" bind:value={body.service.artifact_id}/>
-      <Input required label="Health report url" bind:value={body.service.health_report_url}/>
-      <Input required label="Filebeat config url" bind:value={body.service.filebeat_config_url}/>
-      <Input required multiline autogrow label="Local override properties" bind:value={body.service.local_override_properties}/>
-      <Input required multiline label="Semantic update service properties" bind:value={body.service.semantic_update_service_properties}/>
-      <Input required multiline label="key" bind:value={body.key}/>
-      <Button click={service} bind:disabled>Create</Button>
-    </form>
+    <NewServer bind:user />
   </div>
-  <div class="item">
-    <NewServer bind:user bind:loadbalancers />
-  </div>
-  <div class="item">
-    <h2>Add server in scope</h2>
-    <p>Use this to add an existing service to a server</p>
-    <form on:submit|preventDefault={() => {}}>
-      <Input required label="Scope" bind:value={scope}/>
-      <Input required label="Server name" bind:value={server_name}/>
-      <Input required number label="Port" bind:value={body.service.port}/>
-      <Input required label="Path" bind:value={body.service.path}/>
-      <Input required label="Artifact ID" bind:value={body.service.artifact_id}/>
-      <Input required label="Health report url" bind:value={body.service.health_report_url}/>
-      <Input required label="Filebeat config url" bind:value={body.service.filebeat_config_url}/>
-      <Input required multiline autogrow label="Local override properties" bind:value={body.service.local_override_properties}/>
-      <Input required multiline label="Semantic update service properties" bind:value={body.service.semantic_update_service_properties}/>
-      <Input required multiline label="key" bind:value={body.key}/>
-      <Button click={service} bind:disabled>Add</Button>
-    </form>
+  <div class="large_item">
+    <NewService bind:user bind:loadbalancers />
   </div>
   <div class="new_line" style="padding-top: 1.5em;"/>
   {loadbalancers}

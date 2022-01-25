@@ -33,12 +33,13 @@ type Service struct {
 	Key              string `form:"key" json:"key" xml:"key"`
 }
 
-func (c AWS) AddServiceToServer(scope, serverName string, v vpclib.VPC, k key.Key, sg security.Group, service Service) (cryptData string) {
+func (c AWS) AddServiceToServer(scope, serverName string, v vpclib.VPC, k key.Key, sg security.Group, slackId string, service Service) (cryptData string) {
 	seq := sequence{
 		ec2:           c.ec2,
 		elb:           c.elb,
 		shouldCleanUp: false,
 		deleters:      NewStack(),
+		slackId:       slackId,
 		scope:         scope,
 		service:       service,
 		vpc:           v,
@@ -75,18 +76,19 @@ func (c AWS) AddServiceToServer(scope, serverName string, v vpclib.VPC, k key.Ke
 	}
 	seq.InstallOnServer()
 
-	seq.SendCertLogin()
+	seq.SendServiceOnServer()
 	seq.FinishedAllOpperations()
 	cryptData = seq.cryptData
 	return
 }
 
-func (c AWS) AddNewServerToScope(scope, serverName string, v vpclib.VPC, k key.Key, sg security.Group, service Service) (cryptData string) {
+func (c AWS) AddServerToScope(scope, serverName string, v vpclib.VPC, k key.Key, sg security.Group, slackId string, service Service) (cryptData string) {
 	seq := sequence{
 		ec2:           c.ec2,
 		elb:           c.elb,
 		shouldCleanUp: false,
 		deleters:      NewStack(),
+		slackId:       slackId,
 		scope:         scope,
 		service:       service,
 		vpc:           v,
@@ -100,62 +102,52 @@ func (c AWS) AddNewServerToScope(scope, serverName string, v vpclib.VPC, k key.K
 	seq.StartingServerSettup()
 	seq.CreateNewServer(serverName)
 	seq.WaitForServerToStart()
-	isNotNewService, err := CheckIfServiceExcistsInScope(scope, service.ArtifactId, c.ec2)
-	if err != nil {
-		log.AddError(err).Fatal("While chekking if service exits in scope")
-	}
-	if isNotNewService {
-		seq.GetTargetGroup()
-	} else {
-		seq.CreateTargetGroup()
-	}
-	seq.CreateTarget()
-	if !isNotNewService {
-		seq.AddRuleToListener()
-	}
-	seq.DoneSettingUpServer()
+	/*
+		isNotNewService, err := CheckIfServiceExcistsInScope(scope, service.ArtifactId, c.ec2)
+		if err != nil {
+			log.AddError(err).Fatal("While chekking if service exits in scope")
+		}
+		if isNotNewService {
+			seq.GetTargetGroup()
+		} else {
+			seq.CreateTargetGroup()
+		}
+		seq.CreateTarget()
+		if !isNotNewService {
+			seq.AddRuleToListener()
+		}
+		seq.DoneSettingUpServer()
 
-	if isNotNewService {
-		seq.TagAdditionalServer()
-	} else {
-		seq.TagNewService()
-	}
-	seq.InstallOnServer()
-
-	seq.SendCertLogin()
+		if isNotNewService {
+			seq.TagAdditionalServer()
+		} else {
+			seq.TagNewService()
+		}
+		seq.InstallOnServer()
+	*/
+	seq.SendLogin()
 	seq.FinishedAllOpperations()
 	cryptData = seq.cryptData
 	return
 }
 
-func (c AWS) CreateNewServerInScope(scope, serverName string, service Service) (cryptData string) {
+func (c AWS) CreateScope(scope string) (cryptData string) {
 	seq := sequence{
 		ec2:           c.ec2,
 		elb:           c.elb,
 		shouldCleanUp: false,
 		deleters:      NewStack(),
 		scope:         scope,
-		service:       service,
 	}
 	defer seq.Cleanup()
 
 	//AWS
-	seq.CheckServerName(serverName)
 	seq.StartingServerSettup()
 	seq.CreateKey()
 	seq.GetVPC()
 	seq.CreateSecurityGroup()
-	seq.CreateNewServer(serverName)
-	seq.WaitForServerToStart()
-	seq.CreateTargetGroup()
-	seq.CreateTarget()
-	seq.AddRuleToListener()
-	seq.DoneSettingUpServer()
-	seq.TagNewService()
 
-	seq.InstallOnServer()
-
-	seq.SendCertLogin()
+	seq.SendScope()
 	seq.FinishedAllOpperations()
 	cryptData = seq.cryptData
 	return
@@ -166,6 +158,7 @@ type sequence struct {
 	elb           *elbv2.ELBV2
 	shouldCleanUp bool
 	deleters      Stack
+	slackId       string
 	scope         string
 	service       Service
 	key           keylib.Key
@@ -471,6 +464,37 @@ func (c *sequence) InstallFilebeat() {
 	slack.SendStatus(s)
 }
 
+func (c *sequence) SendScope() {
+	slackId, err := slack.SendBase(fmt.Sprintf(":ghost:Created new scope: %s", c.scope))
+	if err != nil {
+		log.AddError(err).Fatal("While sending encrypted cert and login to slack")
+	}
+	encrypted, err := Encrypt(c.scope, c.vpc, c.key, c.securityGroup, slackId)
+	if err != nil {
+		log.AddError(err).Fatal("While encrypting data to send to slack")
+	}
+	c.cryptData = encrypted
+	_, err = slack.SendFollowup(fmt.Sprintf(":ghost:%s\n```%s```", c.key.PemName, encrypted), slackId)
+	if err != nil {
+		log.AddError(err).Fatal("While sending encrypted cert and login to slack")
+	}
+}
+
+func (c *sequence) SendLogin() {
+	_, err := slack.SendFollowup(fmt.Sprintf(":ghost:ssh ec2-user@%s -i %s", c.server.PublicDNS, c.key.PemName), c.slackId)
+	if err != nil {
+		log.AddError(err).Fatal("While sending encrypted cert and login to slack")
+	}
+}
+
+func (c *sequence) SendServiceOnServer() {
+	_, err := slack.SendFollowup(fmt.Sprintf(":ghost:%s > %s", c.service.ArtifactId, c.server.Name), c.slackId)
+	if err != nil {
+		log.AddError(err).Fatal("While sending encrypted cert and login to slack")
+	}
+}
+
+/*
 func (c *sequence) SendCertLogin() {
 	encrypted, err := Encrypt(c.scope, c.vpc, c.key, c.securityGroup)
 	if err != nil {
@@ -482,6 +506,7 @@ func (c *sequence) SendCertLogin() {
 		log.AddError(err).Fatal("While sending encrypted cert and login to slack")
 	}
 }
+*/
 
 func (c *sequence) FinishedAllOpperations() {
 	s := fmt.Sprintf("Completed all opperations for creating the new server %s.", c.server.Name)

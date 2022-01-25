@@ -101,8 +101,9 @@ func main() {
 		username: password,
 	}))
 	//auth.PUT("/server/:scope/*server", newServerHandler(&c))
+	auth.PUT("/scope/:scope", newScopeHandler(&c))
 	auth.PUT("/server/:scope/:server", newServerInScopeHandler(&c))
-	auth.PUT("/service/:scope/:server", newServiceOnServerHandler(&c))
+	auth.PUT("/service/:scope/:server/:service", newServiceOnServerHandler(&c))
 	auth.POST("/key", newKeyHandler(&c))
 	auth.POST("/keyCrypt", newKeyCryptHandler())
 	auth.GET("/loadbalancers", newLoadbalancerHandler(&c))
@@ -172,7 +173,7 @@ func newKeyHandler(cld *cloud.AWS) func(*gin.Context) {
 			})
 			return
 		}
-		scope, _, k, sg, err := cloud.Decrypt(body.Key, cld)
+		scope, _, k, sg, _, err := cloud.Decrypt(body.Key, cld)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"message": "Unable to decrypt key",
@@ -224,6 +225,31 @@ func newLoadbalancerHandler(cld *cloud.AWS) func(*gin.Context) {
 	}
 }
 
+func newScopeHandler(cld *cloud.AWS) func(*gin.Context) {
+	return func(c *gin.Context) {
+		scope := c.Param("scope")
+		if err := cloud.CheckNameLen(scope); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"message": fmt.Sprintf("Scope name is limited by length"),
+				"error":   err.Error(),
+			})
+			return
+		}
+		crypData := cld.CreateScope(scope)
+		if crypData == "" {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"message": "Something went wrong while creating scope",
+			})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Server successfully created",
+			"key":     crypData,
+		})
+		return
+	}
+}
+
 type scopeReq struct {
 	Key       string            `form:"key" json:"key" xml:"key"`
 	Service   cloud.Service     `form:"service" json:"service" xml:"service" binding:"required"`
@@ -250,22 +276,13 @@ func newServerInScopeHandler(cld *cloud.AWS) func(*gin.Context) {
 			})
 			return
 		}
-		log.Println(req.Key)
 		if req.Key == "" {
-			crypData := cld.CreateNewServerInScope(scope, server, req.Service)
-			if crypData == "" {
-				c.JSON(http.StatusInternalServerError, gin.H{
-					"message": "Something wend wrong while creating server",
-				})
-				return
-			}
-			c.JSON(http.StatusOK, gin.H{
-				"message": "Server successfully created",
-				"key":     crypData,
+			c.JSON(http.StatusBadRequest, gin.H{
+				"message": "Body with key and service is required",
 			})
 			return
 		}
-		cryptScope, v, k, sg, err := cloud.Decrypt(req.Key, cld)
+		cryptScope, v, k, sg, ts, err := cloud.Decrypt(req.Key, cld)
 		if err != nil {
 			log.AddError(err).Fatal("While dekrypting cryptdata")
 		}
@@ -273,7 +290,7 @@ func newServerInScopeHandler(cld *cloud.AWS) func(*gin.Context) {
 		if cryptScope != scope {
 			log.Fatal("Scope in cryptodata and provided scope are different")
 		}
-		crypData := cld.AddNewServerToScope(scope, server, v, k, sg, req.Service)
+		crypData := cld.AddServerToScope(scope, server, v, k, sg, ts, req.Service)
 		if crypData == "" {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"message": "Something wend wrong while creating server",
@@ -290,7 +307,8 @@ func newServerInScopeHandler(cld *cloud.AWS) func(*gin.Context) {
 func newServiceOnServerHandler(cld *cloud.AWS) func(*gin.Context) {
 	return func(c *gin.Context) {
 		scope := c.Param("scope")
-		server := c.Param("server") //[1:]
+		server := c.Param("server")
+		service := c.Param("service")
 		if err := cloud.CheckNameLen(scope); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"message": fmt.Sprintf("Scope name is limited by length"),
@@ -307,14 +325,17 @@ func newServiceOnServerHandler(cld *cloud.AWS) func(*gin.Context) {
 			})
 			return
 		}
-		cryptScope, v, k, sg, err := cloud.Decrypt(req.Key, cld)
+		cryptScope, v, k, sg, ts, err := cloud.Decrypt(req.Key, cld)
 		if err != nil {
 			log.AddError(err).Fatal("While dekrypting cryptdata")
 		}
 		if cryptScope != scope {
 			log.Fatal("Scope in cryptodata and provided scope are different")
 		}
-		crypData := cld.AddServiceToServer(scope, server, v, k, sg, req.Service)
+		if req.Service.ArtifactId != service {
+			log.Fatal("Artifact id and provided service does not match")
+		}
+		crypData := cld.AddServiceToServer(scope, server, v, k, sg, ts, req.Service)
 		if crypData == "" {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"message": "Something wend wrong while creating server",
