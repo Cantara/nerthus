@@ -52,6 +52,7 @@
   let valid_key = false;
   let valid_scope = false;
   let valid_server = false;
+  let valid_loadbalancer = false;
   let valid_port = false;
   let valid_path = false;
   let valid_artifact = false;
@@ -82,7 +83,7 @@ $: {
 $: body.service.elb_listener_arn = loadbalancer.listener_arn
 $: body.service.elb_securitygroup_id = loadbalancer.security_group
 
-$: disabled = !(valid_scope && valid_server && valid_key && valid_port && valid_path && valid_artifact && valid_health && valid_filebeat && valid_local && valid_semantic)
+$: disabled = !(valid_scope && valid_server && valid_loadbalancer && valid_key && valid_port && valid_path && valid_artifact && valid_health && valid_filebeat && valid_local && valid_semantic)
 </script>
 
 <h2>Add service to server</h2>
@@ -90,6 +91,7 @@ $: disabled = !(valid_scope && valid_server && valid_key && valid_port && valid_
 <form on:submit|preventDefault={() => {}}>
   <Input required label="Scope" bind:value={scope} bind:valid={valid_scope}/>
   <Input required label="Server name" bind:value={server_name} bind:valid={valid_server}/>
+  <Select required label="Loadbalancer" values={loadbalancersDropdown} bind:value={loadbalancer} bind:valid={valid_loadbalancer}/>
   <Input required number label="Port" bind:value={body.service.port} bind:valid={valid_port}/>
   <Input required label="Path" bind:value={body.service.path} bind:valid={valid_path}/>
   <Input required label="Artifact ID" bind:value={body.service.artifact_id} bind:valid={valid_artifact}/>
