@@ -58,11 +58,14 @@ func GetServer(name, scope string, key key.Key, group security.Group, e2 *ec2.EC
 	if len(result.Reservations) < 1 {
 		err = fmt.Errorf("No servers with name %s", name)
 	}
-	if len(result.Reservations) > 1 {
+	/* if len(result.Reservations) > 1 {
 		err = fmt.Errorf("Too many servers with name %s", name)
-	}
+	} */
 	for _, reservation := range result.Reservations {
 		for _, instance := range reservation.Instances {
+			if aws.StringValue(instance.State.Name) != "running" {
+				continue
+			}
 			for _, tag := range instance.Tags {
 				if aws.StringValue(tag.Key) == "Scope" && aws.StringValue(tag.Value) == scope {
 					if len(instance.BlockDeviceMappings) < 1 || len(instance.NetworkInterfaces) < 1 {
