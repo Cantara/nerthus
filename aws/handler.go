@@ -33,7 +33,7 @@ type Service struct {
 	Key              string `form:"key" json:"key" xml:"key"`
 }
 
-func (c AWS) AddServiceToServer(scope, serverName string, v vpclib.VPC, k key.Key, sg security.Group, slackId string, service Service) (cryptData string) {
+func (c AWS) AddServiceToServer(scope, serverName string, v vpclib.VPC, k key.Key, sg security.Group, slackId string, service Service) (message string) {
 	seq := sequence{
 		ec2:           c.ec2,
 		elb:           c.elb,
@@ -79,11 +79,12 @@ func (c AWS) AddServiceToServer(scope, serverName string, v vpclib.VPC, k key.Ke
 
 	seq.SendServiceOnServer()
 	seq.FinishedAllOpperations()
-	cryptData = seq.cryptData
+	//cryptData = seq.cryptData
+	message = "succsess"
 	return
 }
 
-func (c AWS) AddServerToScope(scope, serverName string, v vpclib.VPC, k key.Key, sg security.Group, slackId string) (cryptData string) {
+func (c AWS) AddServerToScope(scope, serverName string, v vpclib.VPC, k key.Key, sg security.Group, slackId string) (message string) {
 	seq := sequence{
 		ec2:           c.ec2,
 		elb:           c.elb,
@@ -127,7 +128,7 @@ func (c AWS) AddServerToScope(scope, serverName string, v vpclib.VPC, k key.Key,
 	*/
 	seq.SendLogin()
 	seq.FinishedAllOpperations()
-	cryptData = seq.cryptData
+	message = "succsess"
 	return
 }
 
