@@ -124,7 +124,7 @@ func (g *Group) Delete() (err error) {
 	return
 }
 
-func (g Group) AddBaseAuthorization(loadbalancerId string, port int) (err error) {
+func (g Group) AddBaseAuthorization() (err error) {
 	err = util.CheckEC2Session(g.ec2)
 	if err != nil {
 		return
@@ -132,17 +132,6 @@ func (g Group) AddBaseAuthorization(loadbalancerId string, port int) (err error)
 	input := &ec2.AuthorizeSecurityGroupIngressInput{
 		GroupId: aws.String(g.Id),
 		IpPermissions: []*ec2.IpPermission{
-			{
-				FromPort:   aws.Int64(int64(port)),
-				IpProtocol: aws.String("tcp"),
-				ToPort:     aws.Int64(int64(port)),
-				UserIdGroupPairs: []*ec2.UserIdGroupPair{
-					{
-						Description: aws.String("HTTP access from loadbalancer"),
-						GroupId:     aws.String(loadbalancerId),
-					},
-				},
-			},
 			{
 				FromPort:   aws.Int64(22),
 				IpProtocol: aws.String("tcp"),
@@ -161,6 +150,40 @@ func (g Group) AddBaseAuthorization(loadbalancerId string, port int) (err error)
 	if err != nil {
 		err = util.CreateError{
 			Text: fmt.Sprintf("Could not add base authorization to security group %s %s.", g.Id, g.Name),
+			Err:  err,
+		}
+		return
+	}
+
+	return
+}
+
+func (g Group) AddLoadbalancerAuthorization(loadbalancerId string, port int) (err error) {
+	err = util.CheckEC2Session(g.ec2)
+	if err != nil {
+		return
+	}
+	input := &ec2.AuthorizeSecurityGroupIngressInput{
+		GroupId: aws.String(g.Id),
+		IpPermissions: []*ec2.IpPermission{
+			{
+				FromPort:   aws.Int64(int64(port)),
+				IpProtocol: aws.String("tcp"),
+				ToPort:     aws.Int64(int64(port)),
+				UserIdGroupPairs: []*ec2.UserIdGroupPair{
+					{
+						Description: aws.String("HTTP access from loadbalancer"),
+						GroupId:     aws.String(loadbalancerId),
+					},
+				},
+			},
+		},
+	}
+
+	_, err = g.ec2.AuthorizeSecurityGroupIngress(input)
+	if err != nil {
+		err = util.CreateError{
+			Text: fmt.Sprintf("Could not add service loadbalancer authorization to security group %s %s.", g.Id, g.Name),
 			Err:  err,
 		}
 		return

@@ -62,6 +62,7 @@ func (c AWS) AddServiceToServer(scope, serverName string, v vpclib.VPC, k key.Ke
 	if isNotNewService {
 		seq.GetTargetGroup()
 	} else {
+		seq.AddLoadbalancerAuthorizationToSecurityGroup()
 		seq.CreateTargetGroup()
 	}
 	seq.CreateTarget()
@@ -256,7 +257,17 @@ func (c *sequence) CreateSecurityGroup() {
 }
 
 func (c *sequence) AddBaseAuthorizationToSecurityGroup() {
-	err := c.securityGroup.AddBaseAuthorization(c.service.ELBSecurityGroup, c.service.Port)
+	err := c.securityGroup.AddBaseAuthorization()
+	if err != nil {
+		log.AddError(err).Fatal("Could not add base authorization")
+	}
+	s := fmt.Sprintf(":ghost: Added base authorization to security group: %s.", c.securityGroup.Id)
+	log.Info(s)
+	slack.SendStatus(s)
+}
+
+func (c *sequence) AddLoadbalancerAuthorizationToSecurityGroup() {
+	err := c.securityGroup.AddLoadbalancerAuthorization(c.service.ELBSecurityGroup, c.service.Port)
 	if err != nil {
 		log.AddError(err).Fatal("Could not add base authorization")
 	}

@@ -167,7 +167,6 @@ $: body.service.elb_securitygroup_id = loadbalancer.security_group
     <NewService bind:user bind:loadbalancers />
   </div>
   <div class="new_line" style="padding-top: 1.5em;"/>
-  {loadbalancers}
 </div>
 
 <style>
