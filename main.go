@@ -252,7 +252,7 @@ func newScopeHandler(cld *cloud.AWS) func(*gin.Context) {
 
 type scopeReq struct {
 	Key       string            `form:"key" json:"key" xml:"key"`
-	Service   cloud.Service     `form:"service" json:"service" xml:"service" binding:"required"`
+	Service   cloud.Service     `form:"service" json:"service" xml:"service"`
 	ISpesProp map[string]string `form:"instance_specific_propperties" json:"instance_specific_propperties" xml:"instance_specific_propperties"`
 }
 
