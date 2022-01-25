@@ -61,21 +61,28 @@ func GetServer(name, scope string, key key.Key, group security.Group, e2 *ec2.EC
 	if len(result.Reservations) > 1 {
 		err = fmt.Errorf("Too many servers with name %s", name)
 	}
-	for _, tag := range result.Reservations[0].Instances[0].Tags {
-		if aws.StringValue(tag.Key) == "Scope" && aws.StringValue(tag.Value) == scope {
-			s = Server{
-				Name:               name,
-				Scope:              scope,
-				key:                key,
-				group:              group,
-				Id:                 aws.StringValue(result.Reservations[0].Instances[0].InstanceId),
-				PublicDNS:          aws.StringValue(result.Reservations[0].Instances[0].PublicDnsName),
-				VolumeId:           aws.StringValue(result.Reservations[0].Instances[0].BlockDeviceMappings[0].Ebs.VolumeId),
-				NetworkInterfaceId: aws.StringValue(result.Reservations[0].Instances[0].NetworkInterfaces[0].NetworkInterfaceId),
-				ImageId:            aws.StringValue(result.Reservations[0].Instances[0].ImageId),
-				ec2:                e2,
+	for _, reservation := range result.Reservations {
+		for _, instance := range reservation.Instances {
+			for _, tag := range instance.Tags {
+				if aws.StringValue(tag.Key) == "Scope" && aws.StringValue(tag.Value) == scope {
+					if len(instance.BlockDeviceMappings) < 1 || len(instance.NetworkInterfaces) < 1 {
+						continue
+					}
+					s = Server{
+						Name:               name,
+						Scope:              scope,
+						key:                key,
+						group:              group,
+						Id:                 aws.StringValue(instance.InstanceId),
+						PublicDNS:          aws.StringValue(instance.PublicDnsName),
+						VolumeId:           aws.StringValue(instance.BlockDeviceMappings[0].Ebs.VolumeId),
+						NetworkInterfaceId: aws.StringValue(instance.NetworkInterfaces[0].NetworkInterfaceId),
+						ImageId:            aws.StringValue(instance.ImageId),
+						ec2:                e2,
+					}
+					return
+				}
 			}
-			return
 		}
 	}
 	err = fmt.Errorf("Server name %s was not in scope %s", name, scope)

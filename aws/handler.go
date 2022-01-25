@@ -492,7 +492,7 @@ func (c *sequence) SendScope() {
 }
 
 func (c *sequence) SendLogin() {
-	_, err := slack.SendFollowup(fmt.Sprintf("ssh ec2-user@%s -i %s", c.server.PublicDNS, c.key.PemName), c.slackId)
+	_, err := slack.SendFollowup(fmt.Sprintf("%s\n`ssh ec2-user@%s -i %s`", c.server.Name, c.server.PublicDNS, c.key.PemName), c.slackId)
 	if err != nil {
 		log.AddError(err).Fatal("While sending encrypted cert and login to slack")
 	}
