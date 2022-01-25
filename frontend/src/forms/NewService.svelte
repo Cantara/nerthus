@@ -5,7 +5,7 @@
   import Select from "../components/Select.svelte";
 
   function putService() {
-    fetch('/nerthus/service/'+scope+'/'+server_name+'/'+body.artifact_id, {
+    fetch('/nerthus/service/'+scope+'/'+server_name+'/'+body.service.artifact_id, {
       method: 'PUT',
       mode: 'cors',
       cache: 'no-cache',

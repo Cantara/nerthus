@@ -55,7 +55,7 @@ func sendMessage(message, slackId, ts string) (resp slackRespons, err error) {
 	return resp, PostAuth("https://slack.com/api/chat.postMessage", slackMessage{
 		SlackId: slackId,
 		TS:      ts,
-		Text:    message,
+		Text:    ":ghost:" + message,
 		Pinned:  false,
 	}, &resp)
 }
