@@ -83,7 +83,7 @@ func (c AWS) AddServiceToServer(scope, serverName string, v vpclib.VPC, k key.Ke
 	return
 }
 
-func (c AWS) AddServerToScope(scope, serverName string, v vpclib.VPC, k key.Key, sg security.Group, slackId string, service Service) (cryptData string) {
+func (c AWS) AddServerToScope(scope, serverName string, v vpclib.VPC, k key.Key, sg security.Group, slackId string) (cryptData string) {
 	seq := sequence{
 		ec2:           c.ec2,
 		elb:           c.elb,
@@ -91,7 +91,6 @@ func (c AWS) AddServerToScope(scope, serverName string, v vpclib.VPC, k key.Key,
 		deleters:      NewStack(),
 		slackId:       slackId,
 		scope:         scope,
-		service:       service,
 		vpc:           v,
 		key:           k,
 		securityGroup: sg,

@@ -250,10 +250,8 @@ func newScopeHandler(cld *cloud.AWS) func(*gin.Context) {
 	}
 }
 
-type scopeReq struct {
-	Key       string            `form:"key" json:"key" xml:"key"`
-	Service   cloud.Service     `form:"service" json:"service" xml:"service"`
-	ISpesProp map[string]string `form:"instance_specific_propperties" json:"instance_specific_propperties" xml:"instance_specific_propperties"`
+type serverReq struct {
+	Key string `form:"key" json:"key" xml:"key"`
 }
 
 func newServerInScopeHandler(cld *cloud.AWS) func(*gin.Context) {
@@ -267,7 +265,7 @@ func newServerInScopeHandler(cld *cloud.AWS) func(*gin.Context) {
 			})
 			return
 		}
-		var req scopeReq
+		var req serverReq
 		err := c.ShouldBind(&req)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
@@ -290,7 +288,7 @@ func newServerInScopeHandler(cld *cloud.AWS) func(*gin.Context) {
 		if cryptScope != scope {
 			log.Fatal("Scope in cryptodata and provided scope are different")
 		}
-		crypData := cld.AddServerToScope(scope, server, v, k, sg, ts, req.Service)
+		crypData := cld.AddServerToScope(scope, server, v, k, sg, ts)
 		if crypData == "" {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"message": "Something wend wrong while creating server",
@@ -302,6 +300,12 @@ func newServerInScopeHandler(cld *cloud.AWS) func(*gin.Context) {
 			"key":     crypData,
 		})
 	}
+}
+
+type serviceReq struct {
+	Key       string            `form:"key" json:"key" xml:"key"`
+	Service   cloud.Service     `form:"service" json:"service" xml:"service" binding:"required"`
+	ISpesProp map[string]string `form:"instance_specific_propperties" json:"instance_specific_propperties" xml:"instance_specific_propperties"`
 }
 
 func newServiceOnServerHandler(cld *cloud.AWS) func(*gin.Context) {
@@ -316,7 +320,7 @@ func newServiceOnServerHandler(cld *cloud.AWS) func(*gin.Context) {
 			})
 			return
 		}
-		var req scopeReq
+		var req serviceReq
 		err := c.ShouldBind(&req)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
