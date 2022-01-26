@@ -50,6 +50,19 @@ exit
 	return
 }
 
+func (s Server) AddAutoUpdate() (err error) {
+	script := `
+cat <<'EOF' > ~/CRON
+MAILTO=""
+*/30 * * * * sudo yum update -y > /dev/null
+EOF
+
+crontab ~/CRON
+`
+	_, err = s.RunScript(script)
+	return
+}
+
 func (s Server) Update() (err error) {
 	script := "sudo yum update -y"
 	_, err = s.RunScript(script)

@@ -103,6 +103,7 @@ func (c AWS) AddServerToScope(scope, serverName string, v vpclib.VPC, k key.Key,
 	seq.StartingServerSettup()
 	seq.CreateNewServer(serverName)
 	seq.WaitForServerToStart()
+	seq.AddAutoUpdate()
 	/*
 		isNotNewService, err := CheckIfServiceExcistsInScope(scope, service.ArtifactId, c.ec2)
 		if err != nil {
@@ -414,10 +415,20 @@ func (c sequence) StartingServiceInstallation() {
 	slack.SendStatus(s)
 }
 
+func (c sequence) AddAutoUpdate() {
+	err := c.serversh.AddAutoUpdate()
+	if err != nil {
+		log.AddError(err).Fatal(fmt.Sprintf("While adding auto updatating %s: %s", c.server.Name, c.server.PublicDNS))
+	}
+	s := fmt.Sprintf("%s: %s, Adding auto updat to server %s.", c.scope, c.server.Name, c.server.PublicDNS)
+	log.Info(s)
+	slack.SendStatus(s)
+}
+
 func (c sequence) UpdateServer() {
 	err := c.serversh.Update()
 	if err != nil {
-		log.AddError(err).Fatal(fmt.Sprintf("While updatating %s", c.server.PublicDNS))
+		log.AddError(err).Fatal(fmt.Sprintf("While updatating %s: %s", c.server.Name, c.server.PublicDNS))
 	}
 	s := fmt.Sprintf("%s: %s %s, Updated server %s.", c.scope, c.server.Name, c.service.ArtifactId, c.server.PublicDNS)
 	log.Info(s)

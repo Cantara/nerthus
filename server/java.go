@@ -32,6 +32,8 @@ func (j Java) isInstalled() (installed bool, err error) {
 		script = "yum list installed | grep zulu8"
 	case JAVA_ONE_ELEVEN:
 		script = "yum list installed | grep zulu11"
+	default:
+		return
 	}
 	stdout, err := j.Server.RunScript(script)
 	if err != nil {
