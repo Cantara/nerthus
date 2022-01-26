@@ -8,7 +8,7 @@ const (
 )
 
 func (v Version) String() string {
-	return []string{"java-1.8.0-openjdk", "java-11-openjdk"}[v]
+	return []string{"zulu8-jdk", "zulu11-jdk"}[v]
 }
 
 type Java struct {
@@ -29,9 +29,9 @@ func (j Java) isInstalled() (installed bool, err error) {
 	script := ""
 	switch j.Version {
 	case JAVA_ONE_EIGHT:
-		script = "yum list installed | grep java-1.8.0-openjdk"
+		script = "yum list installed | grep zulu8"
 	case JAVA_ONE_ELEVEN:
-		script = "yum list installed | grep java-11-openjdk"
+		script = "yum list installed | grep zulu11"
 	}
 	stdout, err := j.Server.RunScript(script)
 	if err != nil {
@@ -47,12 +47,14 @@ func (j *Java) Create() (id string, err error) {
 		j.installed = false
 		return
 	}
-	script := ""
+	script := "sudo yum install -y https://cdn.azul.com/zulu/bin/zulu-repo-1.0.0-1.noarch.rpm\n"
 	switch j.Version {
 	case JAVA_ONE_EIGHT:
-		script = "sudo yum install -y java-1.8.0-openjdk"
+		script += "sudo yum install -y zulu8-jdk"
 	case JAVA_ONE_ELEVEN:
-		script = "sudo amazon-linux-extras install -y java-openjdk11"
+		script += "sudo yum install -y zulu11-jdk"
+	default:
+		return
 	}
 	_, err = j.Server.RunScript(script)
 	if err != nil {
@@ -66,13 +68,16 @@ func (j *Java) Delete() (err error) {
 	if !j.installed {
 		return
 	}
-	script := ""
+	script := "yum list installed | grep "
 	switch j.Version {
 	case JAVA_ONE_EIGHT:
-		script = "sudo yum remove -y java-1.8.0-openjdk"
+		script += "zulu8"
 	case JAVA_ONE_ELEVEN:
-		script = "sudo yum remove -y java-11-openjdk"
+		script += "zulu11"
+	default:
+		return
 	}
+	script += " | xargs sudo yum autoremove -y"
 	_, err = j.Server.RunScript(script)
 	return
 }
