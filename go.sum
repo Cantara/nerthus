@@ -26,6 +26,8 @@ github.com/aws/aws-sdk-go v1.42.37 h1:EIziSq3REaoi1LgUBgxoQr29DQS7GYHnBbZPajtJmX
 github.com/aws/aws-sdk-go v1.42.37/go.mod h1:OGr6lGMAKGlG9CVrYnWYDKIyb829c6EVBRjxqjmPepc=
 github.com/aws/aws-sdk-go v1.42.40 h1:oZ+hyhorrkYdT23YO8s0eWBp9Fg8k4HsAFL3n0V25WA=
 github.com/aws/aws-sdk-go v1.42.40/go.mod h1:OGr6lGMAKGlG9CVrYnWYDKIyb829c6EVBRjxqjmPepc=
+github.com/aws/aws-sdk-go v1.42.42 h1:2K61yu5BApC9ExAwC5Vk6ljWzBGbiRGRQYLW7adhP5U=
+github.com/aws/aws-sdk-go v1.42.42/go.mod h1:OGr6lGMAKGlG9CVrYnWYDKIyb829c6EVBRjxqjmPepc=
 github.com/cantara/bragi v0.5.4 h1:Tr0gZ01SwJYX1IvOAVErNY7Zc+bAFzarCde8WRqRxBE=
 github.com/cantara/bragi v0.5.4/go.mod h1:UG6GZBNRGKiMkl2EwlKMQ1tWj2l/9bcXSIzG1b/jVC8=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
