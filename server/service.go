@@ -15,6 +15,7 @@ type Service struct {
 	LocalOverride    string
 	HealthReport     string
 	Path             string
+	AppIcon          string
 	ViliWhydahId     string
 	ViliWhydahSecret string
 	Port             int
@@ -22,13 +23,14 @@ type Service struct {
 	serv             Server
 }
 
-func NewService(name, updateProp, localOverride, healthReport, path string, port int, user User, serv Server) (s Service, err error) {
+func NewService(name, updateProp, localOverride, healthReport, path, appIcon string, port int, user User, serv Server) (s Service, err error) {
 	s = Service{
 		Name:             name,
 		UpdateProp:       updateProp,
 		LocalOverride:    localOverride,
 		HealthReport:     healthReport,
 		Path:             path,
+		AppIcon:          appIcon,
 		Port:             port,
 		user:             user,
 		serv:             serv,
@@ -57,8 +59,11 @@ func (s *Service) Create() (id string, err error) {
 	scripts = strings.ReplaceAll(scripts, "<port_to>", strconv.Itoa(s.Port+10))
 	scripts = strings.ReplaceAll(scripts, "<path>", s.Path)
 	scripts = strings.ReplaceAll(scripts, "<health_report_enpoint>", s.HealthReport)
-	scripts = strings.ReplaceAll(scripts, "<whydah_application_id>", s.ViliWhydahId)
-	scripts = strings.ReplaceAll(scripts, "<whydah_application_secret>", s.ViliWhydahSecret)
+	scripts = strings.ReplaceAll(scripts, "<app_icon>", s.AppIcon)
+	scripts = strings.ReplaceAll(scripts, "<env_icon>", os.Getenv("env_icon"))
+	scripts = strings.ReplaceAll(scripts, "<env>", os.Getenv("env"))
+	//scripts = strings.ReplaceAll(scripts, "<whydah_application_id>", s.ViliWhydahId)
+	//scripts = strings.ReplaceAll(scripts, "<whydah_application_secret>", s.ViliWhydahSecret)
 	_, err = s.serv.RunScript(scripts)
 	return
 }

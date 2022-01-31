@@ -23,6 +23,7 @@ import (
 type Service struct {
 	Port             int    `form:"port" json:"port" xml:"port" binding:"required"`
 	Path             string `form:"path" json:"path" xml:"path" binding:"required"`
+	Icon             string `form:"icon" json:"icon" xml:"icon"`
 	ELBListenerArn   string `form:"elb_listener_arn" json:"elb_listener_arn" xml:"elb_listener_arn" binding:"required"`
 	ELBSecurityGroup string `form:"elb_securitygroup_id" json:"elb_securitygroup_id" xml:"elb_securitygroup_id"`
 	UpdateProp       string `form:"semantic_update_service_properties" json:"semantic_update_service_properties" xml:"semantic_update_service_properties"`
@@ -461,7 +462,7 @@ func (c *sequence) AddUser() {
 }
 
 func (c *sequence) InstallService() {
-	service, err := servershlib.NewService(c.service.ArtifactId, c.service.UpdateProp, c.service.LocalOverride, c.service.HealthReport, c.service.Path, c.service.Port, c.user, c.serversh)
+	service, err := servershlib.NewService(c.service.ArtifactId, c.service.UpdateProp, c.service.LocalOverride, c.service.HealthReport, c.service.Path, c.service.Icon, c.service.Port, c.user, c.serversh)
 	_, err = service.Create()
 	if err != nil {
 		log.AddError(err).Fatal("While setting up service in user")

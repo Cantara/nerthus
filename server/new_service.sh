@@ -71,10 +71,9 @@ manualcontrol="false"
 
 entraos_api_uri="https://api-devtest.entraos.io"
 slack_channel="C02T3A66D2N"
-whydah_uri="https://entrasso-devtest.entraos.io"
-whydah_application_name="EntraOS Vili"
-whydah_application_id="<whydah_application_id>"
-whydah_application_secret="<whydah_application_secret>"
+app_icon="<app_icon>"
+env_icon="<env_icon>"
+env="<env>"
 EOF
 
 ~/scripts/semantic_update_service.sh
