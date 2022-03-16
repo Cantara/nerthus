@@ -23,7 +23,7 @@ func NewServer(publicDNS, pemName string) (s Server, err error) {
 	return
 }
 
-func (s *Server) RunScript(script string) (stdout string, err error) {
+func (s Server) RunScript(script string) (stdout string, err error) {
 	script = script + `
 history -c
 exit

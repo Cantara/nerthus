@@ -411,6 +411,8 @@ func (c sequence) WaitForELBRuleToBeHealthy() {
 }
 
 func (c sequence) VerifyServerSSH() {
+	serv, _ := servershlib.NewServer(seq.server.PublicDNS, seq.key.PemName)
+	seq.serversh = serv
 	err := c.serversh.WaitForConnection()
 	if err != nil {
 		log.AddError(err).Fatal(fmt.Sprintf("While waiting for connection for %s: %s", c.server.Name, c.server.PublicDNS))
@@ -553,8 +555,6 @@ func (c *sequence) FinishedAllOpperations() {
 func (seq *sequence) InstallOnServer() {
 	//Server
 	seq.WaitForELBRuleToBeHealthy()
-	serv, _ := servershlib.NewServer(seq.server.PublicDNS, seq.key.PemName)
-	seq.serversh = serv
 	seq.StartingServiceInstallation()
 	seq.VerifyServerSSH()
 	seq.UpdateServer()
