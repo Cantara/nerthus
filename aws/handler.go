@@ -410,9 +410,9 @@ func (c sequence) WaitForELBRuleToBeHealthy() {
 	slack.SendStatus(s)
 }
 
-func (c sequence) VerifyServerSSH() {
-	serv, _ := servershlib.NewServer(seq.server.PublicDNS, seq.key.PemName)
-	seq.serversh = serv
+func (c *sequence) VerifyServerSSH() {
+	serv, _ := servershlib.NewServer(c.server.PublicDNS, c.key.PemName)
+	c.serversh = serv
 	err := c.serversh.WaitForConnection()
 	if err != nil {
 		log.AddError(err).Fatal(fmt.Sprintf("While waiting for connection for %s: %s", c.server.Name, c.server.PublicDNS))
