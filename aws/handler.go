@@ -104,6 +104,7 @@ func (c AWS) AddServerToScope(scope, serverName string, v vpclib.VPC, k key.Key,
 	seq.StartingServerSettup()
 	seq.CreateNewServer(serverName)
 	seq.WaitForServerToStart()
+	seq.VerifyServerSSH()
 	seq.AddAutoUpdate()
 	/*
 		isNotNewService, err := CheckIfServiceExcistsInScope(scope, service.ArtifactId, c.ec2)
@@ -409,19 +410,21 @@ func (c sequence) WaitForELBRuleToBeHealthy() {
 	slack.SendStatus(s)
 }
 
+func (c sequence) VerifyServerSSH() {
+	err := c.serversh.WaitForConnection()
+	if err != nil {
+		log.AddError(err).Fatal(fmt.Sprintf("While waiting for connection for %s: %s", c.server.Name, c.server.PublicDNS))
+	}
+	s := fmt.Sprintf("%s: %s, SSH connection to %s is verified.", c.scope, c.server.Name, c.server.PublicDNS)
+	log.Info(s)
+	slack.SendStatus(s)
+}
+
 func (c sequence) StartingServiceInstallation() {
 	time.Sleep(time.Second * 30)
 	s := fmt.Sprintf("%s: %s %s, Starting to install stuff on server %s.", c.scope, c.server.Name, c.service.ArtifactId, c.server.PublicDNS)
 	log.Info(s)
 	slack.SendStatus(s)
-	err := c.serversh.WaitForConnection()
-	if err != nil {
-		log.AddError(err).Fatal(fmt.Sprintf("While waiting for connection for %s: %s", c.server.Name, c.server.PublicDNS))
-	}
-	s = fmt.Sprintf("%s: %s, SSH connection to %s is verified.", c.scope, c.server.Name, c.server.PublicDNS)
-	log.Info(s)
-	slack.SendStatus(s)
-
 }
 
 func (c sequence) AddAutoUpdate() {
@@ -550,9 +553,10 @@ func (c *sequence) FinishedAllOpperations() {
 func (seq *sequence) InstallOnServer() {
 	//Server
 	seq.WaitForELBRuleToBeHealthy()
-	seq.StartingServiceInstallation()
 	serv, _ := servershlib.NewServer(seq.server.PublicDNS, seq.key.PemName)
 	seq.serversh = serv
+	seq.StartingServiceInstallation()
+	seq.VerifyServerSSH()
 	seq.UpdateServer()
 	seq.InstallPrograms()
 	seq.AddUser()
