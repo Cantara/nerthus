@@ -42,7 +42,7 @@ exit
 	if err != nil {
 		var eerr *exec.ExitError
 		if errors.As(err, &eerr) {
-			log.AddError(eerr.Stderr).Warning("Exit error from ssh run command")
+			log.AddError(errors.New(string(eerr.Stderr))).Warning("Exit error from ssh run command")
 		}
 
 		return
