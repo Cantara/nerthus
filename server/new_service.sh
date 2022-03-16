@@ -77,6 +77,8 @@ env="<env>"
 EOF
 
 ~/scripts/semantic_update_service.sh
+./buri -a buri -g no/cantara/gotools
+./buri -a vili -g no/cantara/gotools -r
 ~/scripts/start-vili.sh
 
 # Clear history which contains passwords and secrets

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"time"
 
 	log "github.com/cantara/bragi"
 )
@@ -27,7 +28,7 @@ func (s *Server) RunScript(script string) (stdout string, err error) {
 history -c
 exit
 `
-	cmd := exec.Command("ssh", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no",
+	cmd := exec.Command("ssh", "-o", "ConnectTimeout=5", "-o", "ConnectionAttempts=3", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no",
 		fmt.Sprintf("ec2-user@%s", s.publicDNS), "-i", "./"+s.pemName, "/bin/bash -s")
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -48,6 +49,18 @@ exit
 	}
 	stdout = string(stdoutB)
 	return
+}
+
+func (s Server) WaitForConnection() (err error) {
+	for i := 0; i < 30; i++ {
+		_, err = s.RunScript(`echo "ping"`)
+		if err == nil {
+			return nil
+		}
+		log.AddError(err).Info("While waiting for connection to server %s", s.publicDNS)
+		time.Sleep(10 * time.Second)
+	}
+	return errors.New("Unable to connect to server")
 }
 
 func (s Server) AddAutoUpdate() (err error) {

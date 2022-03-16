@@ -414,6 +414,14 @@ func (c sequence) StartingServiceInstallation() {
 	s := fmt.Sprintf("%s: %s %s, Starting to install stuff on server %s.", c.scope, c.server.Name, c.service.ArtifactId, c.server.PublicDNS)
 	log.Info(s)
 	slack.SendStatus(s)
+	err := c.serversh.WaitForConnection()
+	if err != nil {
+		log.AddError(err).Fatal(fmt.Sprintf("While waiting for connection for %s: %s", c.server.Name, c.server.PublicDNS))
+	}
+	s = fmt.Sprintf("%s: %s, SSH connection to %s is verified.", c.scope, c.server.Name, c.server.PublicDNS)
+	log.Info(s)
+	slack.SendStatus(s)
+
 }
 
 func (c sequence) AddAutoUpdate() {
