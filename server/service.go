@@ -62,8 +62,8 @@ func (s *Service) Create() (id string, err error) {
 	scripts = strings.ReplaceAll(scripts, "<app_icon>", s.AppIcon)
 	scripts = strings.ReplaceAll(scripts, "<env_icon>", os.Getenv("env_icon"))
 	scripts = strings.ReplaceAll(scripts, "<env>", os.Getenv("env"))
-	//scripts = strings.ReplaceAll(scripts, "<whydah_application_id>", s.ViliWhydahId)
-	//scripts = strings.ReplaceAll(scripts, "<whydah_application_secret>", s.ViliWhydahSecret)
+	scripts = strings.ReplaceAll(scripts, "<vili_whydah_id>", s.ViliWhydahId)
+	scripts = strings.ReplaceAll(scripts, "<vili_whydah_secret>", s.ViliWhydahSecret)
 	_, err = s.serv.RunScript(scripts)
 	return
 }

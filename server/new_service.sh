@@ -74,6 +74,11 @@ slack_channel="C02T3A66D2N"
 app_icon="<app_icon>"
 env_icon="<env_icon>"
 env="<env>"
+
+whydah_uri="https://entrasso-devtest.entraos.io"
+whydah_application_name="EntraOS Vili"
+whydah_application_id="<vili_whydah_id>"
+whydah_application_secret="<vili_whydah_secret>"
 EOF
 
 ~/scripts/semantic_update_service.sh
