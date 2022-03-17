@@ -101,7 +101,7 @@ func (c AWS) AddServerToScope(scope, serverName string, v vpclib.VPC, k key.Key,
 
 	//AWS
 	seq.CheckServerName(serverName)
-	seq.StartingServerSettup()
+	seq.StartingServiceSettup()
 	seq.CreateNewServer(serverName)
 	seq.WaitForServerToStart()
 	seq.VerifyServerSSH()
@@ -207,6 +207,12 @@ func (c sequence) CheckServerName(name string) {
 
 func (c sequence) StartingServerSettup() {
 	s := fmt.Sprintf("%s: %s Starting to settup server in aws.", c.scope, c.service.ArtifactId)
+	log.Info(s)
+	slack.SendStatus(s)
+}
+
+func (c sequence) StartingServiceSettup() {
+	s := fmt.Sprintf("%s: %s Starting to settup service on server in aws.", c.scope, c.service.ArtifactId)
 	log.Info(s)
 	slack.SendStatus(s)
 }
