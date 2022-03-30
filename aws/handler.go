@@ -2,6 +2,7 @@ package aws
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"time"
 
@@ -20,6 +21,12 @@ import (
 	"github.com/cantara/nerthus/slack"
 )
 
+type Health struct {
+	Name string `form:"service_name" json:"service_name" xml:"service_name"`
+	Tag  string `form:"service_tag" json:"service_tag" xml:"service_tag"`
+	Type string `form:"service_type" json:"service_type" xml:"service_type"`
+}
+
 type Service struct {
 	Port             int    `form:"port" json:"port" xml:"port" binding:"required"`
 	Path             string `form:"path" json:"path" xml:"path" binding:"required"`
@@ -29,7 +36,7 @@ type Service struct {
 	UpdateProp       string `form:"semantic_update_service_properties" json:"semantic_update_service_properties" xml:"semantic_update_service_properties"`
 	ArtifactId       string `form:"artifact_id" json:"artifact_id" xml:"artifact_id" binding:"required"`
 	LocalOverride    string `form:"local_override_properties" json:"local_override_properties" xml:"local_override_properties"`
-	HealthReport     string `form:"health_report_url" json:"health_report_url" xml:"health_report_url"`
+	Health           Health `form:"health" json:"health" xml:"health"`
 	Key              string `form:"key" json:"key" xml:"key"`
 }
 
@@ -505,7 +512,8 @@ func (c *sequence) AddFilebeatService() {
 }
 
 func (c *sequence) InstallService() {
-	service, err := servershlib.NewService(c.service.ArtifactId, c.service.UpdateProp, c.service.LocalOverride, c.service.HealthReport, c.service.Path, c.service.Icon, c.service.Port, c.user, c.serversh)
+	healthReportUrl := fmt.Sprintf("%s/%s/%s?", os.Getenv("health_url_with_base_path"), c.server.Name, url.PathEscape(c.service.Health.Name)) + url.QueryEscape(fmt.Sprintf("service_tag=%s&service_type=%s", c.service.Health.Tag, c.service.Health.Type))
+	service, err := servershlib.NewService(c.service.ArtifactId, c.service.UpdateProp, c.service.LocalOverride, healthReportUrl, c.service.Path, c.service.Icon, c.service.Port, c.user, c.serversh)
 	_, err = service.Create()
 	if err != nil {
 		log.AddError(err).Fatal("While setting up service in user")

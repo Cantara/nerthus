@@ -3,6 +3,7 @@
   import Dropdown from "./Dropdown.svelte";
 
   export let required = false;
+  export let valid = false;
   export let label = "";
   export let value = {
       name: "",
@@ -15,6 +16,18 @@
     }
   ];
   let open = false;
+
+$: {
+  if (required && !value) {
+    valid = false;
+  } else if (!value.name) {
+    valid = false;
+  } else if (value.name == "") {
+    valid = false;
+  } else {
+    valid = true;
+  }
+}
 </script>
 
 <Dropdown bind:open>

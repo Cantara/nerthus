@@ -5,12 +5,14 @@
   import Select from "../components/Select.svelte";
 
   function putService() {
+    let bodyT = body
+    bodyT.service.health.service_type = bodyT.service.health.service_type.name
     fetch('/nerthus/service/'+scope+'/'+server_name+'/'+body.service.artifact_id, {
       method: 'PUT',
       mode: 'cors',
       cache: 'no-cache',
       credentials: 'omit',
-      body: JSON.stringify(body),
+      body: JSON.stringify(bodyT),
       headers: {
         'Authorization': 'Basic ' + btoa(user.name + ":" + user.password),
         'Accept': 'application/json',
@@ -39,7 +41,13 @@
       port: 0,
       path: "",
       artifact_id: "",
-      health_report_url: "",
+      health: {
+        service_name: "",
+        service_tag: "",
+        service_type: {
+          name: "",
+        },
+      },
       local_override_properties: "",
       semantic_update_service_properties: "",
     },
@@ -55,7 +63,9 @@
   let valid_port = false;
   let valid_path = false;
   let valid_artifact = false;
-  let valid_health = false;
+  let valid_health_name = false;
+  let valid_health_tag = false;
+  let valid_health_type = false;
   let valid_local = false;
   let valid_semantic = false;
 
@@ -68,6 +78,24 @@
   export let loadbalancers = [];
   let loadbalancer = {};
   let loadbalancersDropdown = [];
+  let health_service_tags = [
+    {
+      name: "A2A",
+      extras: [""],
+    },
+    {
+      name: "H2A",
+      extras: [""],
+    },
+    {
+      name: "ACS",
+      extras: [""],
+    },
+    {
+      name: "CS",
+      extras: [""],
+    }
+  ];
 
 $: {
   loadbalancersDropdown = loadbalancers.map(value => ({
@@ -81,7 +109,7 @@ $: {
 $: body.service.elb_listener_arn = loadbalancer.listener_arn
 $: body.service.elb_securitygroup_id = loadbalancer.security_group
 
-$: disabled = !(valid_scope && valid_server && (valid_loadbalancer || loadbalancer != {}) && valid_key && valid_port && valid_path && valid_artifact && valid_health && valid_local && valid_semantic && valid_key)
+$: disabled = !(valid_scope && valid_server && (valid_loadbalancer || loadbalancer != {}) && valid_key && valid_port && valid_path && valid_artifact && valid_health_name && valid_health_tag && (valid_health_type || body.service.health.service_type.name != "") && valid_local && valid_semantic && valid_key)
 </script>
 
 <h2>Add service to server</h2>
@@ -93,7 +121,9 @@ $: disabled = !(valid_scope && valid_server && (valid_loadbalancer || loadbalanc
   <Input required number label="Port" bind:value={body.service.port} bind:valid={valid_port}/>
   <Input required label="Path" bind:value={body.service.path} bind:valid={valid_path}/>
   <Input required label="Artifact ID" bind:value={body.service.artifact_id} bind:valid={valid_artifact}/>
-  <Input required label="Health report url" bind:value={body.service.health_report_url} bind:valid={valid_health}/>
+  <Input required label="Health service name" bind:value={body.service.health.service_name} bind:valid={valid_health_name}/>
+  <Input required label="Health service tag" bind:value={body.service.health.service_tag} bind:valid={valid_health_tag}/>
+  <Select required label="Health service type" values={health_service_types} bind:value={body.service.health.service_type} bind:valid={valid_health_type}/>
   <Input required multiline autogrow label="Local override properties" bind:value={body.service.local_override_properties} bind:valid={valid_local}/>
   <Input required multiline label="Semantic update service properties" bind:value={body.service.semantic_update_service_properties} bind:valid={valid_semantic}/>
   <Input required multiline autogrow label="key" bind:value={body.key} bind:valid={valid_key}/>
