@@ -30,7 +30,6 @@ type Service struct {
 	ArtifactId       string `form:"artifact_id" json:"artifact_id" xml:"artifact_id" binding:"required"`
 	LocalOverride    string `form:"local_override_properties" json:"local_override_properties" xml:"local_override_properties"`
 	HealthReport     string `form:"health_report_url" json:"health_report_url" xml:"health_report_url"`
-	FilebeatConf     string `form:"filebeat_configuration" json:"filebeat_configuration" xml:"filebeat_configuration"`
 	Key              string `form:"key" json:"key" xml:"key"`
 }
 
@@ -106,6 +105,7 @@ func (c AWS) AddServerToScope(scope, serverName string, v vpclib.VPC, k key.Key,
 	seq.WaitForServerToStart()
 	seq.VerifyServerSSH()
 	seq.AddAutoUpdate()
+	seq.InstallFilebeat()
 	/*
 		isNotNewService, err := CheckIfServiceExcistsInScope(scope, service.ArtifactId, c.ec2)
 		if err != nil {
@@ -455,6 +455,18 @@ func (c sequence) UpdateServer() {
 	slack.SendStatus(s)
 }
 
+func (c *sequence) InstallFilebeat() {
+	filebeat, err := servershlib.NewFilebeat(os.Getenv("filebeat_password"), c.serversh)
+	_, err = filebeat.Create()
+	if err != nil {
+		log.AddError(err).Fatal(fmt.Sprintf("While installed filebeat on %s", c.server.Name))
+	}
+	c.deleters.Push(cleanup("Filebeat service from server", "while removing filebeat service from server", &filebeat))
+	s := fmt.Sprintf("%s: %s, Added filebeat.", c.scope, c.server.Name)
+	log.Info(s)
+	slack.SendStatus(s)
+}
+
 func (c *sequence) InstallPrograms() {
 	java, err := servershlib.NewJava(servershlib.JAVA_ONE_ELEVEN, c.serversh)
 	_, err = java.Create()
@@ -480,6 +492,18 @@ func (c *sequence) AddUser() {
 	c.user = user
 }
 
+func (c *sequence) AddFilebeatService() {
+	filebeatService, err := servershlib.NewFilebeatService(c.server.Name, c.service.ArtifactId, c.user.Name, c.serversh)
+	_, err = filebeatService.Create()
+	if err != nil {
+		log.AddError(err).Fatal(fmt.Sprintf("While adding filebeat script for %s", c.service.ArtifactId))
+	}
+	c.deleters.Push(cleanup("Filebeat service from server", "while removing filebeat service from server", &filebeatService))
+	s := fmt.Sprintf("%s: %s %s, Added filebeat service.", c.scope, c.server.Name, c.service.ArtifactId)
+	log.Info(s)
+	slack.SendStatus(s)
+}
+
 func (c *sequence) InstallService() {
 	service, err := servershlib.NewService(c.service.ArtifactId, c.service.UpdateProp, c.service.LocalOverride, c.service.HealthReport, c.service.Path, c.service.Icon, c.service.Port, c.user, c.serversh)
 	_, err = service.Create()
@@ -488,20 +512,6 @@ func (c *sequence) InstallService() {
 	}
 	c.deleters.Push(cleanup("Service installed on server", "while stopping service", &service))
 	s := fmt.Sprintf("%s: %s %s, Done installing service on server %s.", c.scope, c.server.Name, c.service.ArtifactId, c.server.PublicDNS)
-	log.Info(s)
-	slack.SendStatus(s)
-}
-
-func (c *sequence) InstallFilebeat() {
-	return //TODO: remove me
-	filebeat, err := servershlib.NewFilebeat("asdasd", c.service.FilebeatConf, c.serversh)
-	_, err = filebeat.Create()
-	if err != nil {
-		log.AddError(err).Fatal(fmt.Sprintf("While installing filebeat with config %s", c.service.FilebeatConf))
-	}
-	//c.deleters.Push(cleanup("Filebeat config", "while removing filebeat config", &filebeat))
-	c.deleters.Push(cleanup("Filebeat from server", "while removing filebeat from server", &filebeat))
-	s := fmt.Sprintf("%s: %s %s, Done installing filebeat on server %s.", c.scope, c.server.Name, c.service.ArtifactId, c.server.PublicDNS)
 	log.Info(s)
 	slack.SendStatus(s)
 }
@@ -567,7 +577,7 @@ func (seq *sequence) InstallOnServer() {
 	seq.InstallPrograms()
 	seq.AddUser()
 	seq.InstallService()
-	seq.InstallFilebeat()
+	seq.AddFilebeatService()
 }
 
 /*

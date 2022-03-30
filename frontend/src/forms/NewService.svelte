@@ -40,7 +40,6 @@
       path: "",
       artifact_id: "",
       health_report_url: "",
-      filebeat_config_url: "",
       local_override_properties: "",
       semantic_update_service_properties: "",
     },
@@ -57,7 +56,6 @@
   let valid_path = false;
   let valid_artifact = false;
   let valid_health = false;
-  let valid_filebeat = false;
   let valid_local = false;
   let valid_semantic = false;
 
@@ -83,7 +81,7 @@ $: {
 $: body.service.elb_listener_arn = loadbalancer.listener_arn
 $: body.service.elb_securitygroup_id = loadbalancer.security_group
 
-$: disabled = !(valid_scope && valid_server && valid_loadbalancer && valid_key && valid_port && valid_path && valid_artifact && valid_health && valid_filebeat && valid_local && valid_semantic)
+$: disabled = !(valid_scope && valid_server && (valid_loadbalancer || loadbalancer != {}) && valid_key && valid_port && valid_path && valid_artifact && valid_health && valid_local && valid_semantic && valid_key)
 </script>
 
 <h2>Add service to server</h2>
@@ -96,7 +94,6 @@ $: disabled = !(valid_scope && valid_server && valid_loadbalancer && valid_key &
   <Input required label="Path" bind:value={body.service.path} bind:valid={valid_path}/>
   <Input required label="Artifact ID" bind:value={body.service.artifact_id} bind:valid={valid_artifact}/>
   <Input required label="Health report url" bind:value={body.service.health_report_url} bind:valid={valid_health}/>
-  <Input required label="Filebeat config url" bind:value={body.service.filebeat_config_url} bind:valid={valid_filebeat}/>
   <Input required multiline autogrow label="Local override properties" bind:value={body.service.local_override_properties} bind:valid={valid_local}/>
   <Input required multiline label="Semantic update service properties" bind:value={body.service.semantic_update_service_properties} bind:valid={valid_semantic}/>
   <Input required multiline autogrow label="key" bind:value={body.key} bind:valid={valid_key}/>

@@ -1,35 +1,39 @@
 package server
 
 import (
+	"embed"
 	"errors"
-	"io/ioutil"
 	"strings"
 
 	log "github.com/cantara/bragi"
 )
 
 type Filebeat struct {
-	Name      string
-	ConfigUrl string
-	serv      Server
+	url      string
+	password string
+	serv     Server
 }
 
-func NewFilebeat(name, configUrl string, serv Server) (f Filebeat, err error) {
+func NewFilebeat(password string, serv Server) (f Filebeat, err error) {
 	f = Filebeat{
-		Name:      name,
-		ConfigUrl: configUrl,
-		serv:      serv,
+		url:      "https://cloud.humio.com:443/api/v1/ingest/elastic-bulk",
+		password: password,
+		serv:     serv,
 	}
 	return
 }
 
+//go:embed filebeat.sh
+var fsFB embed.FS
+
 func (f *Filebeat) Create() (id string, err error) {
-	script, err := ioutil.ReadFile("./filebeat.sh")
+	script, err := fsFB.ReadFile("filebeat.sh")
 	if err != nil {
 		log.AddError(err).Warning("While reading in filebeat script")
 		return
 	}
-	scripts := strings.ReplaceAll(string(script), "<filebeat_configuration>", f.ConfigUrl)
+	scripts := strings.ReplaceAll(string(script), "<filebeat_url>", f.url)
+	scripts = strings.ReplaceAll(scripts, "<filebeat_password>", f.password)
 	_, err = f.serv.RunScript(scripts)
 	return
 }
