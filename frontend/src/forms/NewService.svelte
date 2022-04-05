@@ -78,7 +78,7 @@
   export let loadbalancers = [];
   let loadbalancer = {};
   let loadbalancersDropdown = [];
-  let health_service_tags = [
+  let health_service_types = [
     {
       name: "A2A",
       extras: [""],
