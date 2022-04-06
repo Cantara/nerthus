@@ -512,7 +512,7 @@ func (c *sequence) AddFilebeatService() {
 }
 
 func (c *sequence) InstallService() {
-	healthReportUrl := fmt.Sprintf("%s/%s/%s?service_tag=%s&service_type=%s", os.Getenv("health_url_with_base_path"), c.server.Name, url.PathEscape(c.service.Health.Name), url.QueryEscape(c.service.Health.Tag), url.QueryEscape(c.service.Health.Type))
+	healthReportUrl := fmt.Sprintf("%s/%s/%s?service_tag=%s&service_type=%s", os.Getenv("health_url_with_base_path"), url.PathEscape(c.service.Health.Name), c.server.Name, url.QueryEscape(c.service.Health.Tag), url.QueryEscape(c.service.Health.Type))
 	service, err := servershlib.NewService(c.service.ArtifactId, c.service.UpdateProp, c.service.LocalOverride, healthReportUrl, c.service.Path, c.service.Icon, c.service.Port, c.user, c.serversh)
 	_, err = service.Create()
 	if err != nil {
