@@ -3,7 +3,8 @@ sudo wget -O /etc/yum.repos.d/filebeat.repo https://gist.githubusercontent.com/k
 sudo yum install -y filebeat
 sudo chkconfig --add filebeat
 sudo service filebeat restart
-sudo cat <<'EOF' > /etc/filebeat/filebeat.yml
+sudo su
+cat <<'EOF' > /etc/filebeat/filebeat.yml
 # ============================== Filebeat inputs ===============================
 
 filebeat.inputs:
@@ -47,6 +48,7 @@ logging:
     name: filebeat.log
     keepfiles: 3
 EOF
+exit
 sudo service filebeat restart
 if ! sudo ls /etc/filebeat/inputs.d &> /dev/null ; then
   sudo mkdir /etc/filebeat/inputs.d

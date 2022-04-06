@@ -1,4 +1,5 @@
-sudo cat <<'EOF' > /etc/filebeat/inputs.d/<filebeat_server_name>.yml
+sudo su
+cat <<'EOF' > /etc/filebeat/inputs.d/<filebeat_server_name>.yml
 # Service <filebeat_artifact_id> config
 - type: log
   enabled: true
@@ -28,4 +29,5 @@ sudo cat <<'EOF' > /etc/filebeat/inputs.d/<filebeat_server_name>.yml
     vili: "vili"
     tags: ["<filebeat_artifact_id>-vili"]
 EOF
+exit
 sudo service filebeat restart
