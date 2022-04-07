@@ -31,7 +31,7 @@ cat <<'EOF' > ~/scripts/CRON
 MAILTO=""
 */6 * * * * ./scripts/semantic_update_service.sh > /dev/null
 */6 * * * * ./buri -a buri -g no/cantara/gotools > /dev/null
-*/6 * * * * ./buri -a vili -g no/cantara/gotools -r > /dev/null
+*/6 * * * * ./scripts/start-vili.sh > /dev/null
 * * * * * ./scripts/reportServiceHealthToVisuale.sh > /dev/null
 EOF
 
