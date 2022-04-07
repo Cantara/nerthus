@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"os"
+
+	log "github.com/cantara/bragi"
 )
 
 type slackMessage struct {
@@ -95,6 +97,9 @@ func PostAuth(uri string, data interface{}, out interface{}) (err error) {
 		return
 	}
 	err = json.Unmarshal(body, out)
+	if err != nil {
+		log.AddError(err).Warning(fmt.Sprintf("%s\t%s", body, data))
+	}
 	return
 }
 
