@@ -283,7 +283,7 @@ func newServerInScopeHandler(cld *cloud.AWS) func(*gin.Context) {
 			return
 		}
 		body, _ := json.Marshal(req)
-		go slack.SendCommand(fmt.Sprintf("server/%s/%s", scope, server), body)
+		go slack.SendCommand(fmt.Sprintf("server/%s/%s", scope, server), string(body))
 		cryptScope, v, k, sg, ts, err := cloud.Decrypt(req.Key, cld)
 		if err != nil {
 			log.AddError(err).Fatal("While dekrypting cryptdata")
@@ -334,7 +334,7 @@ func newServiceOnServerHandler(cld *cloud.AWS) func(*gin.Context) {
 			return
 		}
 		body, _ := json.Marshal(req)
-		go slack.SendCommand(fmt.Sprintf("service/%s/%s/%s", scope, server, service), body)
+		go slack.SendCommand(fmt.Sprintf("service/%s/%s/%s", scope, server, service), string(body))
 		cryptScope, v, k, sg, ts, err := cloud.Decrypt(req.Key, cld)
 		if err != nil {
 			log.AddError(err).Fatal("While dekrypting cryptdata")
