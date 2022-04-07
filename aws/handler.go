@@ -213,13 +213,13 @@ func (c sequence) CheckServerName(name string) {
 }
 
 func (c sequence) StartingServerSettup() {
-	s := fmt.Sprintf("%s: %s Starting to settup server in aws.", c.scope, c.service.ArtifactId)
+	s := fmt.Sprintf("%s: %s Starting to setup server in aws.", c.scope, c.service.ArtifactId)
 	log.Info(s)
 	slack.SendStatus(s)
 }
 
 func (c sequence) StartingServiceSettup() {
-	s := fmt.Sprintf("%s: %s Starting to settup service on server in aws.", c.scope, c.service.ArtifactId)
+	s := fmt.Sprintf("%s: %s Starting to setup service on server in aws.", c.scope, c.service.ArtifactId)
 	log.Info(s)
 	slack.SendStatus(s)
 }
@@ -447,7 +447,7 @@ func (c sequence) AddAutoUpdate() {
 	if err != nil {
 		log.AddError(err).Fatal(fmt.Sprintf("While adding auto updatating %s: %s", c.server.Name, c.server.PublicDNS))
 	}
-	s := fmt.Sprintf("%s: %s, Adding auto updat to server %s.", c.scope, c.server.Name, c.server.PublicDNS)
+	s := fmt.Sprintf("%s: %s, Adding auto update to server %s.", c.scope, c.server.Name, c.server.PublicDNS)
 	log.Info(s)
 	slack.SendStatus(s)
 }
@@ -569,7 +569,7 @@ func (c *sequence) SendCertLogin() {
 */
 
 func (c *sequence) FinishedAllOpperations() {
-	s := fmt.Sprintf("%s: %s %s, Completed all opperations for creating the new server %s.", c.scope, c.server.Name, c.service.ArtifactId, c.server.Name)
+	s := fmt.Sprintf("%s: %s %s, Completed all operations for creating the new server %s.", c.scope, c.server.Name, c.service.ArtifactId, c.server.Name)
 	log.Info(s)
 	slack.SendStatus(s)
 	//shouldCleanUp = true

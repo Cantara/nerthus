@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"strings"
+	"unicode"
 )
 
 type User struct {
@@ -14,9 +15,13 @@ type User struct {
 func NewUser(name string, serv Server) (u User, err error) {
 	name = strings.ToLower(name)
 	name = strings.ReplaceAll(name, "api", "API")
-	name = strings.ReplaceAll(name, "-", " ")
-	name = strings.Title(name)
-	name = strings.ReplaceAll(name, " ", "")
+	names := strings.Split(name, "-")
+	for i := 1; i < len(names); i++ {
+		n := []rune(names[i])
+		n[0] = unicode.ToUpper(n[0])
+		names[i] = string(n)
+	}
+	name = strings.Join(names, "")
 	u = User{
 		Name: name,
 		serv: serv,
