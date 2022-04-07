@@ -3,6 +3,7 @@ package slack
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -94,5 +95,14 @@ func PostAuth(uri string, data interface{}, out interface{}) (err error) {
 		return
 	}
 	err = json.Unmarshal(body, out)
+	return
+}
+
+func SendCommand(endpoint, body string) (err error) {
+	_, err = sendMessage(fmt.Sprintf(`curl --header "Content-Type: application/json" \
+	--header "Authorization: Basic <base64 username and password>" \
+  --request POST \
+  --data '%s' \
+	baseurl/%s`, body, endpoint), os.Getenv("slack_channel_commands"), "")
 	return
 }

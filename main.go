@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -235,6 +236,7 @@ func newScopeHandler(cld *cloud.AWS) func(*gin.Context) {
 			})
 			return
 		}
+		go slack.SendCommand(fmt.Sprintf("scope/%s", scope), "")
 		crypData := cld.CreateScope(scope)
 		if crypData == "" {
 			c.JSON(http.StatusInternalServerError, gin.H{
@@ -280,6 +282,8 @@ func newServerInScopeHandler(cld *cloud.AWS) func(*gin.Context) {
 			})
 			return
 		}
+		body, _ := json.Marshal(req)
+		go slack.SendCommand(fmt.Sprintf("server/%s/%s", scope, server), body)
 		cryptScope, v, k, sg, ts, err := cloud.Decrypt(req.Key, cld)
 		if err != nil {
 			log.AddError(err).Fatal("While dekrypting cryptdata")
@@ -329,6 +333,8 @@ func newServiceOnServerHandler(cld *cloud.AWS) func(*gin.Context) {
 			})
 			return
 		}
+		body, _ := json.Marshal(req)
+		go slack.SendCommand(fmt.Sprintf("service/%s/%s/%s", scope, server, service), body)
 		cryptScope, v, k, sg, ts, err := cloud.Decrypt(req.Key, cld)
 		if err != nil {
 			log.AddError(err).Fatal("While dekrypting cryptdata")
