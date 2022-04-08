@@ -6,7 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
+	"strings"
+	"time"
 
 	log "github.com/cantara/bragi"
 )
@@ -54,8 +55,34 @@ type BotProfile struct {
 	*/
 }
 
+type client struct {
+	baseurl        string
+	token          string
+	secretChannel  string
+	statusChennel  string
+	commandChannel string
+	messageChan    chan Message
+}
+
+var c client
+var statusMessageChan chan string
+
+func NewClient(authToken, secretChannel, statusChennel, commandChannel string) (err error) {
+	c = client{
+		baseurl:        "https://slack.com",
+		token:          authToken,
+		secretChannel:  secretChannel,
+		statusChennel:  statusChennel,
+		commandChannel: commandChannel,
+		messageChan:    make(chan Message, 10),
+	}
+	statusMessageChan = make(chan string, 50)
+	go statusMessageWatcher()
+	return nil
+}
+
 func sendMessage(message, slackId, ts string) (resp slackRespons, err error) {
-	return resp, PostAuth("https://slack.com/api/chat.postMessage", slackMessage{
+	return resp, PostAuth(c.baseurl+"/api/chat.postMessage", slackMessage{
 		SlackId: slackId,
 		TS:      ts,
 		Text:    ":ghost:" + message,
@@ -68,7 +95,7 @@ func SendBase(message string) (id string, err error) {
 }
 
 func SendFollowup(message, id string) (idOut string, err error) {
-	resp, err := sendMessage(message, os.Getenv("slack_channel_secret"), id)
+	resp, err := sendMessage(message, c.secretChannel, id)
 	if err != nil {
 		return
 	}
@@ -76,9 +103,37 @@ func SendFollowup(message, id string) (idOut string, err error) {
 	return
 }
 
-func SendStatus(message string) (err error) {
-	_, err = sendMessage(message, os.Getenv("slack_channel_status"), "")
-	return
+func statusMessageWatcher() {
+	ticker := time.NewTicker(5 * time.Second)
+	builder := strings.Builder{}
+	failCount := 0
+	for {
+		select {
+		case <-ticker.C:
+			if builder.Len() <= 0 {
+				continue
+			}
+			_, err := sendMessage(builder.String(), c.statusChennel, "")
+			if err != nil {
+				if failCount >= 3 {
+					failCount = 0
+					builder.Reset()
+					continue
+				}
+				failCount++
+				time.Sleep(3 * time.Second)
+				continue
+			}
+			builder.Reset()
+		case message := <-statusMessageChan:
+			builder.WriteString(message)
+			builder.WriteString("\n")
+		}
+	}
+}
+
+func SendStatus(message string) {
+	statusMessageChan <- message
 }
 
 func PostAuth(uri string, data interface{}, out interface{}) (err error) {
@@ -86,7 +141,7 @@ func PostAuth(uri string, data interface{}, out interface{}) (err error) {
 	client := &http.Client{}
 	req, err := http.NewRequest("POST", uri, bytes.NewBuffer(jsonValue))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+os.Getenv("slack_token"))
+	req.Header.Set("Authorization", "Bearer "+c.token)
 	resp, err := client.Do(req)
 	if err != nil || out == nil {
 		return
@@ -104,10 +159,10 @@ func PostAuth(uri string, data interface{}, out interface{}) (err error) {
 }
 
 func SendCommand(endpoint, body string) (err error) {
-	_, err = sendMessage(fmt.Sprintf(`curl --header "Content-Type: application/json" \
+	_, err = sendMessage(fmt.Sprintf(`%[1]scurl --header "Content-Type: application/json" \
 	--header "Authorization: Basic <base64 username and password>" \
   --request POST \
   --data '%s' \
-	baseurl/%s`, body, endpoint), os.Getenv("slack_channel_commands"), "")
+	baseurl/%s%[1]s`, "```", body, endpoint), c.commandChannel, "")
 	return
 }

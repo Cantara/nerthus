@@ -46,6 +46,7 @@ func GetOutboundIP() net.IP {
 
 func main() {
 	loadEnv()
+	slack.NewClient(os.Getenv("slack_token"), os.Getenv("slack_channel_secret"), os.Getenv("slack_channel_status"), os.Getenv("slack_channel_commands"))
 	crypto.InitCrypto()
 	since := time.Now()
 
