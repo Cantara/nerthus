@@ -45,7 +45,7 @@ chmod +x "buri"
 
 cat <<'EOF' > ~/scripts/start-vili.sh
 #!/bin/sh
-./buri -a vili -g no/cantara/gotools -r
+./buri -a vili -g no/cantara/gotools -r &
 EOF
 chmod +x ~/scripts/start-vili.sh
 
