@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elbv2"
+	"github.com/aws/aws-sdk-go/service/rds"
 	log "github.com/cantara/bragi"
 	"github.com/cantara/nerthus/aws/key"
 	"github.com/cantara/nerthus/aws/security"
@@ -32,6 +33,7 @@ func CheckNameLen(name string) error {
 type AWS struct {
 	ec2 *ec2.EC2
 	elb *elbv2.ELBV2
+	rds *rds.RDS
 }
 
 func (a AWS) GetELB() *elbv2.ELBV2 {
@@ -62,6 +64,20 @@ func (a *AWS) NewELB(c client.ConfigProvider) {
 func (a AWS) hasELBSession() error {
 	if a.elb == nil {
 		return fmt.Errorf("No elb session found")
+	}
+	return nil
+}
+
+func (a *AWS) NewRDS(c client.ConfigProvider) {
+	if a.rds != nil {
+		return
+	}
+	a.rds = rds.New(c)
+}
+
+func (a AWS) hasRDSSession() error {
+	if a.rds == nil {
+		return fmt.Errorf("No rds session found")
 	}
 	return nil
 }

@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/base32"
 	"encoding/base64"
 	"encoding/pem"
 	"errors"
@@ -87,6 +88,12 @@ func Decrypt(baseText string) (data []byte, err error) {
 	nonce, ciphertext := ciphertext[:nonceSize], ciphertext[nonceSize:]
 	data, err = gcm.Open(nil, nonce, ciphertext, nil)
 	return
+}
+
+func GenRandBase32String(length int) string {
+	random := make([]byte, length)
+	rand.Read(random)
+	return base32.StdEncoding.EncodeToString(random)[:length]
 }
 
 /*

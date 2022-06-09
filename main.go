@@ -65,6 +65,8 @@ func main() {
 	c.NewEC2(sess)
 	// Create an ELBv2 service client.
 	c.NewELB(sess)
+	// Create an rds service client.
+	c.NewRDS(sess)
 
 	r := gin.Default()
 	config := cors.DefaultConfig()
@@ -106,6 +108,7 @@ func main() {
 	auth.PUT("/scope/:scope", newScopeHandler(&c))
 	auth.PUT("/server/:scope/:server", newServerInScopeHandler(&c))
 	auth.PUT("/service/:scope/:server/:service", newServiceOnServerHandler(&c))
+	auth.PUT("/database/:scope/:artifactId", newDatabaseInScopeHandler(&c))
 	auth.POST("/key", newKeyHandler(&c))
 	auth.POST("/keyCrypt", newKeyCryptHandler())
 	auth.GET("/loadbalancers", newLoadbalancerHandler(&c))
@@ -302,6 +305,56 @@ func newServerInScopeHandler(cld *cloud.AWS) func(*gin.Context) {
 		}
 		c.JSON(http.StatusOK, gin.H{
 			"message": "Server successfully created",
+			"key":     crypData,
+		})
+	}
+}
+
+func newDatabaseInScopeHandler(cld *cloud.AWS) func(*gin.Context) {
+	return func(c *gin.Context) {
+		scope := c.Param("scope")
+		artifactId := c.Param("artifactId") //[1:]
+		if err := cloud.CheckNameLen(scope); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"message": fmt.Sprintf("Scope name is limited by length"),
+				"error":   err.Error(),
+			})
+			return
+		}
+		var req serverReq
+		err := c.ShouldBind(&req)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"message": "Unable to get requred data from request. Supported formats are: JSON, XML and HTML form",
+				"error":   err.Error(),
+			})
+			return
+		}
+		if req.Key == "" {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"message": "Body with key and service is required",
+			})
+			return
+		}
+		body, _ := json.Marshal(req)
+		go slack.SendCommand(fmt.Sprintf("database/%s/%s", scope, artifactId), string(body))
+		cryptScope, v, _, sg, slackId, err := cloud.Decrypt(req.Key, cld)
+		if err != nil {
+			log.AddError(err).Fatal("While dekrypting cryptdata")
+		}
+		log.Println("Decrypted key")
+		if cryptScope != scope {
+			log.Fatal("Scope in cryptodata and provided scope are different")
+		}
+		crypData := cld.CreateDatabase(scope, artifactId, v, sg, slackId)
+		if crypData == "" {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"message": "Something wend wrong while creating database",
+			})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Database successfully created",
 			"key":     crypData,
 		})
 	}

@@ -5,6 +5,7 @@
   import Select from "../components/Select.svelte";
   import NewScope from "../forms/NewScope.svelte";
   import NewServer from "../forms/NewServer.svelte";
+  import NewDatabase from "../forms/NewDatabase.svelte";
   import NewService from "../forms/NewService.svelte";
 
   function server() {
@@ -162,6 +163,9 @@ $: body.service.elb_securitygroup_id = loadbalancer.security_group
   </div>
   <div class="item">
     <NewServer bind:user />
+  </div>
+  <div class="item">
+    <NewDatabase bind:user />
   </div>
   <div class="large_item">
     <NewService bind:user bind:loadbalancers />

@@ -8,7 +8,9 @@ import (
 
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elbv2"
+	"github.com/aws/aws-sdk-go/service/rds"
 	log "github.com/cantara/bragi"
+	databaselib "github.com/cantara/nerthus/aws/database"
 	"github.com/cantara/nerthus/aws/key"
 	keylib "github.com/cantara/nerthus/aws/key"
 	loadbalancerlib "github.com/cantara/nerthus/aws/loadbalancer"
@@ -142,6 +144,29 @@ func (c AWS) AddServerToScope(scope, serverName string, v vpclib.VPC, k key.Key,
 	return
 }
 
+func (c AWS) CreateDatabase(scope, artifactId string, v vpclib.VPC, sg security.Group, slackId string) (cryptData string) {
+	seq := sequence{
+		ec2:           c.ec2,
+		rds:           c.rds,
+		shouldCleanUp: false,
+		deleters:      NewStack(),
+		slackId:       slackId,
+		scope:         scope,
+		vpc:           v,
+		securityGroup: sg,
+	}
+	defer seq.Cleanup()
+
+	//AWS
+	seq.CreateDBSecurityGroup(artifactId)
+	seq.CreateNewDatabase(artifactId)
+
+	seq.SendDBSettup()
+	seq.FinishedAllOpperations()
+	cryptData = seq.cryptData
+	return
+}
+
 func (c AWS) CreateScope(scope string) (cryptData string) {
 	seq := sequence{
 		ec2:           c.ec2,
@@ -165,23 +190,26 @@ func (c AWS) CreateScope(scope string) (cryptData string) {
 }
 
 type sequence struct {
-	ec2           *ec2.EC2
-	elb           *elbv2.ELBV2
-	shouldCleanUp bool
-	deleters      Stack
-	slackId       string
-	scope         string
-	service       Service
-	key           keylib.Key
-	PemName       string
-	cryptData     string
-	vpc           vpclib.VPC
-	securityGroup securitylib.Group
-	server        serverlib.Server
-	targetGroup   loadbalancerlib.TargetGroup
-	rule          loadbalancerlib.Rule
-	serversh      servershlib.Server
-	user          servershlib.User
+	ec2             *ec2.EC2
+	elb             *elbv2.ELBV2
+	rds             *rds.RDS
+	shouldCleanUp   bool
+	deleters        Stack
+	slackId         string
+	scope           string
+	service         Service
+	key             keylib.Key
+	PemName         string
+	cryptData       string
+	vpc             vpclib.VPC
+	securityGroup   securitylib.Group
+	dbSecurityGroup securitylib.Group
+	database        databaselib.Database
+	server          serverlib.Server
+	targetGroup     loadbalancerlib.TargetGroup
+	rule            loadbalancerlib.Rule
+	serversh        servershlib.Server
+	user            servershlib.User
 }
 
 func (c *sequence) Cleanup() {
@@ -272,12 +300,38 @@ func (c *sequence) CreateSecurityGroup() {
 	c.AddBaseAuthorizationToSecurityGroup()
 }
 
+func (c *sequence) CreateDBSecurityGroup(artifactId string) {
+	securityGroup, err := securitylib.NewDBGroup(servershlib.ToFriendlyName(artifactId), c.scope, c.vpc, c.ec2)
+	_, err = securityGroup.Create()
+	if err != nil {
+		log.AddError(err).Fatal("While creating security group")
+	}
+	c.deleters.Push(cleanup("Security group", "while deleting created security group",
+		&securityGroup))
+	s := fmt.Sprintf("%s: Created security group %s with VPC %s.",
+		c.scope, securityGroup.Id, c.vpc.Id)
+	log.Info(s)
+	slack.SendStatus(s)
+	c.dbSecurityGroup = securityGroup
+	c.AddDatabaseAuthorizationToSecurityGroup()
+}
+
 func (c *sequence) AddBaseAuthorizationToSecurityGroup() {
 	err := c.securityGroup.AddBaseAuthorization()
 	if err != nil {
 		log.AddError(err).Fatal("Could not add base authorization")
 	}
 	s := fmt.Sprintf("%s: Added base authorization to security group: %s.", c.scope, c.securityGroup.Id)
+	log.Info(s)
+	slack.SendStatus(s)
+}
+
+func (c *sequence) AddDatabaseAuthorizationToSecurityGroup() {
+	err := c.dbSecurityGroup.AddDatabaseAuthorization(c.securityGroup.Id)
+	if err != nil {
+		log.AddError(err).Fatal("Could not add database authorization")
+	}
+	s := fmt.Sprintf("%s: Added database authorization to security group: %s.", c.scope, c.dbSecurityGroup.Id)
 	log.Info(s)
 	slack.SendStatus(s)
 }
@@ -290,6 +344,19 @@ func (c *sequence) AddLoadbalancerAuthorizationToSecurityGroup() {
 	s := fmt.Sprintf("%s: %s %s, Added base authorization to security group: %s.", c.scope, c.server.Name, c.service.ArtifactId, c.securityGroup.Id)
 	log.Info(s)
 	slack.SendStatus(s)
+}
+
+func (c *sequence) CreateNewDatabase(artifactId string) {
+	database, err := databaselib.NewDatabase(servershlib.ToFriendlyName(artifactId), c.scope, c.securityGroup, c.rds)
+	_, err = database.Create()
+	if err != nil {
+		log.Fatal("Could not create database", err)
+	}
+	c.deleters.Push(cleanup("Database", "while deleting created database", &database))
+	s := fmt.Sprintf("%s: Created database: %s.", c.scope, database.ARN)
+	log.Info(s)
+	slack.SendStatus(s)
+	c.database = database
 }
 
 func (c *sequence) CreateNewServer(serverName string) {
@@ -536,21 +603,28 @@ func (c *sequence) SendScope() {
 	c.cryptData = encrypted
 	_, err = slack.SendFollowup(fmt.Sprintf("%s\n```%s```", c.key.PemName, encrypted), slackId)
 	if err != nil {
-		log.AddError(err).Fatal("While sending encrypted cert and login to slack")
+		log.AddError(err).Fatal("While sending encrypted cert to slack")
 	}
 }
 
 func (c *sequence) SendLogin() {
 	_, err := slack.SendFollowup(fmt.Sprintf("%s\n`ssh ec2-user@%s -i %s`", c.server.Name, c.server.PublicDNS, c.key.PemName), c.slackId)
 	if err != nil {
-		log.AddError(err).Fatal("While sending encrypted cert and login to slack")
+		log.AddError(err).Fatal("While sending new server login to slack")
 	}
 }
 
 func (c *sequence) SendServiceOnServer() {
 	_, err := slack.SendFollowup(fmt.Sprintf("%s > %s", c.service.ArtifactId, c.server.Name), c.slackId)
 	if err != nil {
-		log.AddError(err).Fatal("While sending encrypted cert and login to slack")
+		log.AddError(err).Fatal("While sending info about new service on server to slack")
+	}
+}
+
+func (c *sequence) SendDBSettup() {
+	_, err := slack.SendFollowup(fmt.Sprintf("> Database %s\n ```Endpoint: %s\nDatabase: %s\nUsername: %[3]s\nPassword: %s```", c.database.Name, c.database.Endpoint, c.database.Database, c.database.Password), c.slackId)
+	if err != nil {
+		log.AddError(err).Fatal("While sending database settup to slack")
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elbv2"
+	"github.com/aws/aws-sdk-go/service/rds"
 )
 
 type AWSObject interface {
@@ -22,6 +23,13 @@ func CheckEC2Session(e2 *ec2.EC2) error {
 func CheckELBV2Session(elb *elbv2.ELBV2) error {
 	if elb == nil {
 		return fmt.Errorf("No elbv2 session found")
+	}
+	return nil
+}
+
+func CheckRDSSession(db *rds.RDS) error {
+	if db == nil {
+		return fmt.Errorf("No rds session found")
 	}
 	return nil
 }
