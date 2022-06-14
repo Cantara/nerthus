@@ -227,7 +227,7 @@ func (c *sequence) Cleanup() {
 		delFunc()
 	}
 	log.Info("Cleanup is \"done\", exiting.")
-	slack.SendStatus(":x: Cleanup is \"done\".")
+	slack.SendStatus(":heavy_check_mark: Cleanup is \"done\".")
 }
 
 func (c sequence) CheckServerName(name string) {

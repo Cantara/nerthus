@@ -52,8 +52,8 @@
 $: disabled = !(valid_scope && valid_artifact_id && valid_key)
 </script>
 
-<h2>Add server to scope</h2>
-<p>Use this to create a new server in an existing scope</p>
+<h2>Add database to scope</h2>
+<p>Use this to create a new database in an existing scope</p>
 <form on:submit|preventDefault={() => {}}>
   <Input required label="Scope" bind:value={scope} bind:valid={valid_scope}/>
   <Input required label="Artifact ID" bind:value={artifact_id} bind:valid={valid_artifact_id}/>
