@@ -64,6 +64,8 @@ github.com/aws/aws-sdk-go v1.44.9 h1:s3lsEFbc8i7ghQmcEpcdyvoO/WMwyCVa9pUq3Lq//Ok
 github.com/aws/aws-sdk-go v1.44.9/go.mod h1:y4AeaBuwd2Lk+GepC1E9v0qOiTws0MIWAX4oIKwKHZo=
 github.com/aws/aws-sdk-go v1.44.24 h1:3nOkwJBJLiGBmJKWp3z0utyXuBkxyGkRRwWjrTItJaY=
 github.com/aws/aws-sdk-go v1.44.24/go.mod h1:y4AeaBuwd2Lk+GepC1E9v0qOiTws0MIWAX4oIKwKHZo=
+github.com/aws/aws-sdk-go v1.44.40 h1:MR0qefjBJrZuXE0VoeKMQFtjS2tUeVpbQNfb7NzQNgI=
+github.com/aws/aws-sdk-go v1.44.40/go.mod h1:y4AeaBuwd2Lk+GepC1E9v0qOiTws0MIWAX4oIKwKHZo=
 github.com/cantara/bragi v0.5.4 h1:Tr0gZ01SwJYX1IvOAVErNY7Zc+bAFzarCde8WRqRxBE=
 github.com/cantara/bragi v0.5.4/go.mod h1:UG6GZBNRGKiMkl2EwlKMQ1tWj2l/9bcXSIzG1b/jVC8=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
