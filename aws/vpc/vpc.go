@@ -29,8 +29,17 @@ func GetVPC(e2 *ec2.EC2) (vpc VPC, err error) {
 		err = fmt.Errorf("No VPCs found.")
 		return
 	}
+	var filtered []*ec2.Vpc
+
+	for _, entry := range result.Vpcs {
+		if *entry.IsDefault {
+			filtered = append(filtered, entry)
+			break
+		}
+
+	}
 	vpc = VPC{
-		Id: aws.StringValue(result.Vpcs[0].VpcId),
+		Id: aws.StringValue(filtered[0].VpcId),
 	}
 	return
 }
