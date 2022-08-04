@@ -3,7 +3,7 @@ module github.com/cantara/nerthus
 go 1.18
 
 require (
-	github.com/aws/aws-sdk-go v1.44.62
+	github.com/aws/aws-sdk-go v1.44.69
 	github.com/cantara/bragi v0.5.4
 	github.com/gin-contrib/cors v1.3.1
 	github.com/gin-gonic/gin v1.7.7
