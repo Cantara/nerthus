@@ -89,7 +89,7 @@ func (r *Rule) Create() (id string, err error) {
 	if err != nil {
 		return
 	}
-	path := fmt.Sprintf("/%s/*", r.targetGroup.UriPath)
+	path := fmt.Sprintf("/%s", r.targetGroup.UriPath)
 	input := &elbv2.CreateRuleInput{
 		Actions: []*elbv2.Action{
 			{
@@ -102,6 +102,7 @@ func (r *Rule) Create() (id string, err error) {
 				Field: aws.String("path-pattern"),
 				Values: []*string{
 					aws.String(path),
+					aws.String(path + "/*"),
 				},
 			},
 		},
