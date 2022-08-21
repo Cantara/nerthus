@@ -76,10 +76,10 @@ func main() {
 
 	dash := base.Group("/") //Might need to be in subdir dash
 	{
-		dash.StaticFile("/", "./frontend/index.html")
-		dash.StaticFile("/global.css", "./frontend/global.css")
-		dash.StaticFile("/favicon.png", "./frontend/favicon.png")
-		dash.StaticFS("/build", http.Dir("./frontend/build"))
+		dash.StaticFile("/", "./frontend"+os.Getenv("frontend_path")+"/index.html")
+		dash.StaticFile("/global.css", "./frontend"+os.Getenv("frontend_path")+"/global.css")
+		dash.StaticFile("/favicon.png", "./frontend"+os.Getenv("frontend_path")+"/favicon.png")
+		dash.StaticFS("/build", http.Dir("./frontend"+os.Getenv("frontend_path")+"/build"))
 	}
 
 	outboudIp := GetOutboundIP()

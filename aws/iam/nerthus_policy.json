@@ -1,0 +1,46 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "VisualEditor0",
+            "Effect": "Allow",
+            "Action": [
+                "elasticloadbalancing:SetWebAcl",
+                "elasticloadbalancing:DescribeLoadBalancerAttributes",
+                "elasticloadbalancing:DescribeSSLPolicies",
+                "elasticloadbalancing:DescribeLoadBalancers",
+                "elasticloadbalancing:DescribeTargetGroupAttributes",
+                "elasticloadbalancing:DescribeListeners",
+                "elasticloadbalancing:DescribeAccountLimits",
+                "elasticloadbalancing:DescribeTargetHealth",
+                "elasticloadbalancing:DescribeTargetGroups",
+                "ec2:*",
+                "elasticloadbalancing:DescribeListenerCertificates",
+                "elasticloadbalancing:DescribeRules"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "VisualEditor1",
+            "Effect": "Allow",
+            "Action": "elasticloadbalancing:*",
+            "Resource": [
+                "arn:aws:elasticloadbalancing:*:*:targetgroup/*/*",
+                "arn:aws:elasticloadbalancing:*:*:listener-rule/app/*/*/*/*",
+                "arn:aws:elasticloadbalancing:*:*:listener/app/*/*/*",
+                "arn:aws:elasticloadbalancing:*:*:loadbalancer/app/*/*"
+            ]
+        },
+        {
+            "Sid": "VisualEditor2",
+            "Effect": "Allow",
+            "Action": "elasticloadbalancing:*",
+            "Resource": [
+                "arn:aws:elasticloadbalancing:*:*:loadbalancer/app/*/*",
+                "arn:aws:elasticloadbalancing:*:*:targetgroup/*/*",
+                "arn:aws:elasticloadbalancing:*:*:listener-rule/app/*/*/*/*",
+                "arn:aws:elasticloadbalancing:*:*:listener/app/*/*/*"
+            ]
+        }
+    ]
+}
