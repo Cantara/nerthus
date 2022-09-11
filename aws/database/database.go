@@ -1,10 +1,12 @@
 package database
 
 import (
+	"context"
 	"fmt"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/rds"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/rds"
+	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 	"github.com/cantara/nerthus/aws/security"
 	"github.com/cantara/nerthus/aws/util"
 	"github.com/cantara/nerthus/crypto"
@@ -19,11 +21,11 @@ type Database struct {
 	ARN        string
 	Endpoint   string
 	group      security.Group
-	rds        *rds.RDS
+	rds        *rds.Client
 	created    bool
 }
 
-func NewDatabase(database, scope string, group security.Group, db *rds.RDS) (d Database, err error) {
+func NewDatabase(database, scope string, group security.Group, db *rds.Client) (d Database, err error) {
 	err = util.CheckRDSSession(db)
 	if err != nil {
 		return
@@ -41,9 +43,9 @@ func NewDatabase(database, scope string, group security.Group, db *rds.RDS) (d D
 
 func (d *Database) Create() (arn string, err error) {
 	// Specify the details of the instance that you want to create
-	result, err := d.rds.CreateDBCluster(&rds.CreateDBClusterInput{
-		BackupRetentionPeriod:   aws.Int64(7),
-		AllocatedStorage:        aws.Int64(8),
+	result, err := d.rds.CreateDBCluster(context.Background(), &rds.CreateDBClusterInput{
+		BackupRetentionPeriod:   aws.Int32(7),
+		AllocatedStorage:        aws.Int32(8),
 		DBClusterIdentifier:     aws.String(d.Name),
 		DBClusterInstanceClass:  aws.String("db.t3.micro"),
 		DatabaseName:            aws.String(d.Database),
@@ -51,11 +53,11 @@ func (d *Database) Create() (arn string, err error) {
 		EngineVersion:           aws.String("13.4"),
 		MasterUserPassword:      aws.String(d.Password),
 		MasterUsername:          aws.String(d.Database),
-		Port:                    aws.Int64(5432),
+		Port:                    aws.Int32(5432),
 		AutoMinorVersionUpgrade: aws.Bool(true),
 		StorageEncrypted:        aws.Bool(true),
 		PubliclyAccessible:      aws.Bool(false),
-		Tags: []*rds.Tag{
+		Tags: []rdstypes.Tag{
 			{
 				Key:   aws.String("Name"),
 				Value: aws.String(d.Name),
@@ -73,8 +75,8 @@ func (d *Database) Create() (arn string, err error) {
 		}
 		return
 	}
-	d.ARN = aws.StringValue(result.DBCluster.DBClusterArn)
-	d.Endpoint = aws.StringValue(result.DBCluster.Endpoint)
+	d.ARN = aws.ToString(result.DBCluster.DBClusterArn)
+	d.Endpoint = aws.ToString(result.DBCluster.Endpoint)
 	arn = d.ARN
 	d.created = true
 	return
@@ -84,7 +86,7 @@ func (d *Database) Delete() (err error) {
 	if !d.created {
 		return
 	}
-	_, err = d.rds.DeleteDBCluster(&rds.DeleteDBClusterInput{
+	_, err = d.rds.DeleteDBCluster(context.Background(), &rds.DeleteDBClusterInput{
 		DBClusterIdentifier: aws.String(d.Identifier),
 	})
 	if err != nil {

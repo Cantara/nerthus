@@ -3,9 +3,9 @@ package util
 import (
 	"fmt"
 
-	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/aws/aws-sdk-go/service/elbv2"
-	"github.com/aws/aws-sdk-go/service/rds"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
+	"github.com/aws/aws-sdk-go-v2/service/rds"
 )
 
 type AWSObject interface {
@@ -13,21 +13,21 @@ type AWSObject interface {
 	Delete() error
 }
 
-func CheckEC2Session(e2 *ec2.EC2) error {
+func CheckEC2Session(e2 *ec2.Client) error {
 	if e2 == nil {
 		return fmt.Errorf("No ec2 session found")
 	}
 	return nil
 }
 
-func CheckELBV2Session(elb *elbv2.ELBV2) error {
+func CheckELBV2Session(elb *elbv2.Client) error {
 	if elb == nil {
 		return fmt.Errorf("No elbv2 session found")
 	}
 	return nil
 }
 
-func CheckRDSSession(db *rds.RDS) error {
+func CheckRDSSession(db *rds.Client) error {
 	if db == nil {
 		return fmt.Errorf("No rds session found")
 	}

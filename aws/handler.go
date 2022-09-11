@@ -6,9 +6,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/aws/aws-sdk-go/service/elbv2"
-	"github.com/aws/aws-sdk-go/service/rds"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
+	"github.com/aws/aws-sdk-go-v2/service/rds"
 	log "github.com/cantara/bragi"
 	databaselib "github.com/cantara/nerthus/aws/database"
 	"github.com/cantara/nerthus/aws/key"
@@ -190,9 +190,9 @@ func (c AWS) CreateScope(scope string) (cryptData string) {
 }
 
 type sequence struct {
-	ec2             *ec2.EC2
-	elb             *elbv2.ELBV2
-	rds             *rds.RDS
+	ec2             *ec2.Client
+	elb             *elbv2.Client
+	rds             *rds.Client
 	shouldCleanUp   bool
 	deleters        Stack
 	slackId         string

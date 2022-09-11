@@ -1,25 +1,27 @@
 package key
 
 import (
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	"context"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/cantara/nerthus/aws/util"
+	"time"
 )
 
 type Key struct {
-	Scope       string `json:"-"`
-	Id          string `json:"id"`
-	Name        string `json:"name"`
-	PemName     string `json:"pem_name"`
-	Fingerprint string `json:"fingerprint"`
-	Material    string `json:"material"`
-	Type        string `json:"type"`
-	ec2         *ec2.EC2
+	Scope       string           `json:"-"`
+	Id          string           `json:"id"`
+	Name        string           `json:"name"`
+	PemName     string           `json:"pem_name"`
+	Fingerprint string           `json:"fingerprint"`
+	Material    string           `json:"material"`
+	Type        ec2types.KeyType `json:"type"`
+	ec2         *ec2.Client
 	created     bool
 }
 
-func NewKey(scope string, e2 *ec2.EC2) (k Key, err error) {
+func NewKey(scope string, e2 *ec2.Client) (k Key, err error) {
 	err = util.CheckEC2Session(e2)
 	if err != nil {
 		return
@@ -27,7 +29,7 @@ func NewKey(scope string, e2 *ec2.EC2) (k Key, err error) {
 	k = Key{
 		Scope: scope,
 		Name:  scope + "-key",
-		Type:  "ed25519",
+		Type:  ec2types.KeyTypeEd25519,
 		ec2:   e2,
 	}
 	return
@@ -38,27 +40,16 @@ func (k *Key) Create() (id string, err error) {
 	if err != nil {
 		return
 	}
-	keyResult, err := k.ec2.CreateKeyPair(&ec2.CreateKeyPairInput{
+	keyResult, err := k.ec2.CreateKeyPair(context.Background(), &ec2.CreateKeyPairInput{
 		KeyName: aws.String(k.Name),
-		KeyType: aws.String(k.Type),
+		KeyType: k.Type,
 	})
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok && aerr.Code() == "InvalidKeyPair.Duplicate" {
-			err = util.CreateError{
-				Text: "Duplicate key pair",
-				Err:  aerr,
-			}
-			return
-		}
-		err = util.CreateError{
-			Text: "Unable to create key pair: " + k.Name,
-			Err:  err,
-		}
 		return
 	}
-	k.Id = aws.StringValue(keyResult.KeyPairId)
-	k.Fingerprint = aws.StringValue(keyResult.KeyFingerprint)
-	k.Material = aws.StringValue(keyResult.KeyMaterial)
+	k.Id = aws.ToString(keyResult.KeyPairId)
+	k.Fingerprint = aws.ToString(keyResult.KeyFingerprint)
+	k.Material = aws.ToString(keyResult.KeyMaterial)
 	k.PemName = k.Name + ".pem"
 	id = k.Id
 	k.created = true
@@ -73,11 +64,11 @@ func (k Key) Wait() (err error) {
 	if err != nil {
 		return
 	}
-	err = k.ec2.WaitUntilKeyPairExists(&ec2.DescribeKeyPairsInput{
-		KeyPairIds: []*string{
-			aws.String(k.Id),
+	err = ec2.NewKeyPairExistsWaiter(k.ec2).Wait(context.Background(), &ec2.DescribeKeyPairsInput{
+		KeyPairIds: []string{
+			k.Id,
 		},
-	})
+	}, 5*time.Minute)
 	return
 }
 
@@ -93,11 +84,11 @@ func (k *Key) Delete() (err error) {
 		KeyName: aws.String(k.Name),
 	}
 
-	_, err = k.ec2.DeleteKeyPair(input)
+	_, err = k.ec2.DeleteKeyPair(context.Background(), input)
 	return
 }
 
-func (k Key) WithEC2(e *ec2.EC2) Key {
+func (k Key) WithEC2(e *ec2.Client) Key {
 	k.ec2 = e
 	return k
 }

@@ -1,22 +1,21 @@
 package loadbalancer
 
 import (
-	"fmt"
+	"context"
 	"strconv"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/elbv2"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 	log "github.com/cantara/bragi"
 	"github.com/cantara/nerthus/aws/util"
 )
 
 type Listener struct {
 	ARN string
-	elb *elbv2.ELBV2
+	elb *elbv2.Client
 }
 
-func GetListener(arn string, elb *elbv2.ELBV2) (l Listener, err error) {
+func GetListener(arn string, elb *elbv2.Client) (l Listener, err error) {
 	err = util.CheckELBV2Session(elb)
 	if err != nil {
 		return
@@ -29,41 +28,19 @@ func GetListener(arn string, elb *elbv2.ELBV2) (l Listener, err error) {
 }
 
 func (l Listener) GetLoadbalancer() (loadbalancer string, err error) {
-	result, err := l.elb.DescribeListeners(&elbv2.DescribeListenersInput{
-		ListenerArns: []*string{
-			aws.String(l.ARN),
+	result, err := l.elb.DescribeListeners(context.Background(), &elbv2.DescribeListenersInput{
+		ListenerArns: []string{
+			l.ARN,
 		},
 	})
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			case elbv2.ErrCodeListenerNotFoundException:
-				fmt.Println(elbv2.ErrCodeListenerNotFoundException, aerr.Error())
-				err = util.CreateError{
-					Text: "Listener not found",
-					Err:  aerr,
-				}
-			case elbv2.ErrCodeLoadBalancerNotFoundException:
-				fmt.Println(elbv2.ErrCodeLoadBalancerNotFoundException, aerr.Error())
-				err = util.CreateError{
-					Text: "Loadbalancer not found",
-					Err:  aerr,
-				}
-			case elbv2.ErrCodeUnsupportedProtocolException:
-				fmt.Println(elbv2.ErrCodeUnsupportedProtocolException, aerr.Error())
-				err = util.CreateError{
-					Text: "Unsupported protocol",
-					Err:  aerr,
-				}
-			}
-		}
 		return
 	}
-	loadbalancer = aws.StringValue(result.Listeners[0].LoadBalancerArn)
+	loadbalancer = *result.Listeners[0].LoadBalancerArn
 	return
 }
 
-func GetListeners(loadbalancerARN string, elb *elbv2.ELBV2) (l []Listener, err error) {
+func GetListeners(loadbalancerARN string, elb *elbv2.Client) (l []Listener, err error) {
 	err = util.CheckELBV2Session(elb)
 	if err != nil {
 		return
@@ -72,27 +49,8 @@ func GetListeners(loadbalancerARN string, elb *elbv2.ELBV2) (l []Listener, err e
 		LoadBalancerArn: aws.String(loadbalancerARN),
 	}
 
-	result, err := elb.DescribeListeners(input)
+	result, err := elb.DescribeListeners(context.Background(), input)
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			case elbv2.ErrCodeListenerNotFoundException:
-				err = util.CreateError{
-					Text: "Listener not found",
-					Err:  aerr,
-				}
-			case elbv2.ErrCodeLoadBalancerNotFoundException:
-				err = util.CreateError{
-					Text: "Loadbalancer not found",
-					Err:  aerr,
-				}
-			case elbv2.ErrCodeUnsupportedProtocolException:
-				err = util.CreateError{
-					Text: "Unsupported protocol",
-					Err:  aerr,
-				}
-			}
-		}
 		return
 	}
 
@@ -100,11 +58,11 @@ func GetListeners(loadbalancerARN string, elb *elbv2.ELBV2) (l []Listener, err e
 		if *listener.Port != 443 {
 			continue
 		}
-		if aws.StringValue(listener.Protocol) != "HTTPS" {
+		if listener.Protocol != "HTTPS" {
 			continue
 		}
 		l = append(l, Listener{
-			ARN: aws.StringValue(listener.ListenerArn),
+			ARN: aws.ToString(listener.ListenerArn),
 			elb: elb,
 		})
 	}
@@ -120,34 +78,8 @@ func (l Listener) GetNumRules() (numRules int, err error) {
 		ListenerArn: aws.String(l.ARN),
 	}
 
-	result, err := l.elb.DescribeRules(input)
+	result, err := l.elb.DescribeRules(context.Background(), input)
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			case elbv2.ErrCodeListenerNotFoundException:
-				err = util.CreateError{
-					Text: "Listener not found",
-					Err:  aerr,
-				}
-				return
-			case elbv2.ErrCodeRuleNotFoundException:
-				err = util.CreateError{
-					Text: "Rule not found",
-					Err:  aerr,
-				}
-				return
-			case elbv2.ErrCodeUnsupportedProtocolException:
-				err = util.CreateError{
-					Text: "Unsupported protocol",
-					Err:  aerr,
-				}
-				return
-			}
-		}
-		err = util.CreateError{
-			Text: "Unable to describe rules",
-			Err:  err,
-		}
 		return
 	}
 
@@ -163,39 +95,13 @@ func (l Listener) GetHighestPriority() (highestPri int, err error) {
 		ListenerArn: aws.String(l.ARN),
 	}
 
-	result, err := l.elb.DescribeRules(input)
+	result, err := l.elb.DescribeRules(context.Background(), input)
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			case elbv2.ErrCodeListenerNotFoundException:
-				err = util.CreateError{
-					Text: "Listener not found",
-					Err:  aerr,
-				}
-				return
-			case elbv2.ErrCodeRuleNotFoundException:
-				err = util.CreateError{
-					Text: "Rule not found",
-					Err:  aerr,
-				}
-				return
-			case elbv2.ErrCodeUnsupportedProtocolException:
-				err = util.CreateError{
-					Text: "Unsupported protocol",
-					Err:  aerr,
-				}
-				return
-			}
-		}
-		err = util.CreateError{
-			Text: "Unable to describe rules",
-			Err:  err,
-		}
 		return
 	}
 
 	for _, rule := range result.Rules {
-		priString := aws.StringValue(rule.Priority)
+		priString := aws.ToString(rule.Priority)
 		if priString == "default" {
 			continue
 		}

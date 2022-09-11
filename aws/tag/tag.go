@@ -1,12 +1,13 @@
 package tag
 
 import (
-	"fmt"
-
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/aws/aws-sdk-go/service/elbv2"
+	"context"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
+	//"github.com/aws/aws-sdk-go-v2/aws/awserr"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 	"github.com/cantara/nerthus/aws/util"
 )
 
@@ -16,12 +17,12 @@ type Tag interface {
 }
 
 type tag struct {
-	ec2Resources []*string
-	elbResources []*string
+	ec2Resources []string
+	elbResources []string
 	Key          string
 	Value        string
-	ec2          *ec2.EC2
-	elb          *elbv2.ELBV2
+	ec2          *ec2.Client
+	elb          *elbv2.Client
 	created      bool
 }
 
@@ -31,9 +32,9 @@ func (t *tag) Create() (id string, err error) {
 		if err != nil {
 			return
 		}
-		_, err = t.ec2.CreateTags(&ec2.CreateTagsInput{
+		_, err = t.ec2.CreateTags(context.Background(), &ec2.CreateTagsInput{
 			Resources: t.ec2Resources,
-			Tags: []*ec2.Tag{
+			Tags: []ec2types.Tag{
 				{
 					Key:   aws.String(t.Key),
 					Value: aws.String(t.Value),
@@ -50,9 +51,9 @@ func (t *tag) Create() (id string, err error) {
 			return
 		}
 		for _, resource := range t.elbResources {
-			_, err = t.elb.AddTags(&elbv2.AddTagsInput{
-				ResourceArns: []*string{resource},
-				Tags: []*elbv2.Tag{
+			_, err = t.elb.AddTags(context.Background(), &elbv2.AddTagsInput{
+				ResourceArns: []string{resource},
+				Tags: []elbv2types.Tag{
 					{
 						Key:   aws.String(t.Key),
 						Value: aws.String(t.Value),
@@ -60,46 +61,6 @@ func (t *tag) Create() (id string, err error) {
 				},
 			})
 			if err != nil {
-				if aerr, ok := err.(awserr.Error); ok {
-					switch aerr.Code() {
-					case elbv2.ErrCodeDuplicateTagKeysException:
-						fmt.Println(elbv2.ErrCodeDuplicateTagKeysException, aerr.Error())
-						err = util.CreateError{
-							Text: "Duplicate tag key",
-							Err:  aerr,
-						}
-					case elbv2.ErrCodeTooManyTagsException:
-						fmt.Println(elbv2.ErrCodeTooManyTagsException, aerr.Error())
-						err = util.CreateError{
-							Text: "Too many tags",
-							Err:  aerr,
-						}
-					case elbv2.ErrCodeLoadBalancerNotFoundException:
-						fmt.Println(elbv2.ErrCodeLoadBalancerNotFoundException, aerr.Error())
-						err = util.CreateError{
-							Text: "Loadbalancer not found",
-							Err:  aerr,
-						}
-					case elbv2.ErrCodeTargetGroupNotFoundException:
-						fmt.Println(elbv2.ErrCodeTargetGroupNotFoundException, aerr.Error())
-						err = util.CreateError{
-							Text: "Target group not found",
-							Err:  aerr,
-						}
-					case elbv2.ErrCodeListenerNotFoundException:
-						fmt.Println(elbv2.ErrCodeListenerNotFoundException, aerr.Error())
-						err = util.CreateError{
-							Text: "Listener not found",
-							Err:  aerr,
-						}
-					case elbv2.ErrCodeRuleNotFoundException:
-						fmt.Println(elbv2.ErrCodeRuleNotFoundException, aerr.Error())
-						err = util.CreateError{
-							Text: "Rule not found",
-							Err:  aerr,
-						}
-					}
-				}
 				return
 			}
 		}
@@ -117,9 +78,9 @@ func (t *tag) Delete() (err error) {
 		if err != nil {
 			return
 		}
-		_, err = t.ec2.DeleteTags(&ec2.DeleteTagsInput{
+		_, err = t.ec2.DeleteTags(context.Background(), &ec2.DeleteTagsInput{
 			Resources: t.ec2Resources,
-			Tags: []*ec2.Tag{
+			Tags: []ec2types.Tag{
 				{
 					Key:   aws.String(t.Key),
 					Value: aws.String(t.Value),
@@ -135,54 +96,14 @@ func (t *tag) Delete() (err error) {
 		if err != nil {
 			return
 		}
-		_, err = t.elb.RemoveTags(&elbv2.RemoveTagsInput{
+		_, err = t.elb.RemoveTags(context.Background(), &elbv2.RemoveTagsInput{
 			ResourceArns: t.elbResources,
-			TagKeys: []*string{
-				aws.String(t.Key),
+			TagKeys: []string{
+				t.Key,
 			},
 		})
 
 		if err != nil {
-			if aerr, ok := err.(awserr.Error); ok {
-				switch aerr.Code() {
-				case elbv2.ErrCodeDuplicateTagKeysException:
-					fmt.Println(elbv2.ErrCodeDuplicateTagKeysException, aerr.Error())
-					err = util.CreateError{
-						Text: "Duplicate tag key",
-						Err:  aerr,
-					}
-				case elbv2.ErrCodeTooManyTagsException:
-					fmt.Println(elbv2.ErrCodeTooManyTagsException, aerr.Error())
-					err = util.CreateError{
-						Text: "Too many tags",
-						Err:  aerr,
-					}
-				case elbv2.ErrCodeLoadBalancerNotFoundException:
-					fmt.Println(elbv2.ErrCodeLoadBalancerNotFoundException, aerr.Error())
-					err = util.CreateError{
-						Text: "Loadbalancer not found",
-						Err:  aerr,
-					}
-				case elbv2.ErrCodeTargetGroupNotFoundException:
-					fmt.Println(elbv2.ErrCodeTargetGroupNotFoundException, aerr.Error())
-					err = util.CreateError{
-						Text: "Target group not found",
-						Err:  aerr,
-					}
-				case elbv2.ErrCodeListenerNotFoundException:
-					fmt.Println(elbv2.ErrCodeListenerNotFoundException, aerr.Error())
-					err = util.CreateError{
-						Text: "Listener not found",
-						Err:  aerr,
-					}
-				case elbv2.ErrCodeRuleNotFoundException:
-					fmt.Println(elbv2.ErrCodeRuleNotFoundException, aerr.Error())
-					err = util.CreateError{
-						Text: "Rule not found",
-						Err:  aerr,
-					}
-				}
-			}
 			return
 		}
 	}

@@ -3,11 +3,10 @@ package aws
 import (
 	"encoding/json"
 	"fmt"
-
-	"github.com/aws/aws-sdk-go/aws/client"
-	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/aws/aws-sdk-go/service/elbv2"
-	"github.com/aws/aws-sdk-go/service/rds"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
+	"github.com/aws/aws-sdk-go-v2/service/rds"
 	log "github.com/cantara/bragi"
 	"github.com/cantara/nerthus/aws/key"
 	"github.com/cantara/nerthus/aws/security"
@@ -31,20 +30,20 @@ func CheckNameLen(name string) error {
 }
 
 type AWS struct {
-	ec2 *ec2.EC2
-	elb *elbv2.ELBV2
-	rds *rds.RDS
+	ec2 *ec2.Client
+	elb *elbv2.Client
+	rds *rds.Client
 }
 
-func (a AWS) GetELB() *elbv2.ELBV2 {
+func (a AWS) GetELB() *elbv2.Client {
 	return a.elb
 }
 
-func (a *AWS) NewEC2(c client.ConfigProvider) {
+func (a *AWS) NewEC2(c aws.Config) {
 	if a.ec2 != nil {
 		return
 	}
-	a.ec2 = ec2.New(c)
+	a.ec2 = ec2.NewFromConfig(c)
 }
 
 func (a AWS) hasEC2Session() error {
@@ -54,11 +53,11 @@ func (a AWS) hasEC2Session() error {
 	return nil
 }
 
-func (a *AWS) NewELB(c client.ConfigProvider) {
+func (a *AWS) NewELB(c aws.Config) {
 	if a.elb != nil {
 		return
 	}
-	a.elb = elbv2.New(c)
+	a.elb = elbv2.NewFromConfig(c)
 }
 
 func (a AWS) hasELBSession() error {
@@ -68,11 +67,11 @@ func (a AWS) hasELBSession() error {
 	return nil
 }
 
-func (a *AWS) NewRDS(c client.ConfigProvider) {
+func (a *AWS) NewRDS(c aws.Config) {
 	if a.rds != nil {
 		return
 	}
-	a.rds = rds.New(c)
+	a.rds = rds.NewFromConfig(c)
 }
 
 func (a AWS) hasRDSSession() error {

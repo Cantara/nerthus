@@ -1,10 +1,12 @@
 package vpc
 
 import (
+	"context"
 	"fmt"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/cantara/nerthus/aws/util"
 )
 
@@ -12,12 +14,12 @@ type VPC struct {
 	Id string `json:"id"`
 }
 
-func GetVPC(e2 *ec2.EC2) (vpc VPC, err error) {
+func GetVPC(e2 *ec2.Client) (vpc VPC, err error) {
 	err = util.CheckEC2Session(e2)
 	if err != nil {
 		return
 	}
-	result, err := e2.DescribeVpcs(nil)
+	result, err := e2.DescribeVpcs(context.Background(), nil)
 	if err != nil {
 		err = util.CreateError{
 			Text: "Unable to describe VPCs",
@@ -29,7 +31,7 @@ func GetVPC(e2 *ec2.EC2) (vpc VPC, err error) {
 		err = fmt.Errorf("No VPCs found.")
 		return
 	}
-	var filtered []*ec2.Vpc
+	var filtered []ec2types.Vpc
 
 	for _, entry := range result.Vpcs {
 		if *entry.IsDefault {
@@ -39,7 +41,7 @@ func GetVPC(e2 *ec2.EC2) (vpc VPC, err error) {
 
 	}
 	vpc = VPC{
-		Id: aws.StringValue(filtered[0].VpcId),
+		Id: aws.ToString(filtered[0].VpcId),
 	}
 	return
 }

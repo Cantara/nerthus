@@ -1,11 +1,13 @@
 package security
 
 import (
+	"context"
 	"fmt"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/cantara/nerthus/aws/util"
 	"github.com/cantara/nerthus/aws/vpc"
 )
@@ -16,11 +18,11 @@ type Group struct {
 	Desc    string `json:"-"`
 	Id      string `json:"id"`
 	vpc     vpc.VPC
-	ec2     *ec2.EC2
+	ec2     *ec2.Client
 	created bool
 }
 
-func NewGroup(scope string, vpc vpc.VPC, e2 *ec2.EC2) (g Group, err error) {
+func NewGroup(scope string, vpc vpc.VPC, e2 *ec2.Client) (g Group, err error) {
 	err = util.CheckEC2Session(e2)
 	if err != nil {
 		return
@@ -35,7 +37,7 @@ func NewGroup(scope string, vpc vpc.VPC, e2 *ec2.EC2) (g Group, err error) {
 	return
 }
 
-func NewDBGroup(serviceName, scope string, vpc vpc.VPC, e2 *ec2.EC2) (g Group, err error) {
+func NewDBGroup(serviceName, scope string, vpc vpc.VPC, e2 *ec2.Client) (g Group, err error) {
 	err = util.CheckEC2Session(e2)
 	if err != nil {
 		return
@@ -55,41 +57,21 @@ func (g *Group) Create() (groupId string, err error) {
 	if err != nil {
 		return
 	}
-	secGroupRes, err := g.ec2.CreateSecurityGroup(&ec2.CreateSecurityGroupInput{
+	secGroupRes, err := g.ec2.CreateSecurityGroup(context.Background(), &ec2.CreateSecurityGroupInput{
 		GroupName:   aws.String(g.Name),
 		Description: aws.String(g.Desc),
 		VpcId:       aws.String(g.vpc.Id),
 	})
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			case "InvalidVpcID.NotFound":
-				err = util.CreateError{
-					Text: fmt.Sprintf("Unable to find VPC with ID %q.", g.vpc.Id),
-					Err:  err,
-				}
-				return
-			case "InvalidGroup.Duplicate":
-				err = util.CreateError{
-					Text: fmt.Sprintf("Security group %q already exists.", g.Name),
-					Err:  err,
-				}
-				return
-			}
-		}
-		err = util.CreateError{
-			Text: fmt.Sprintf("Unable to create security group %q.", g.Name),
-			Err:  err,
-		}
 		return
 	}
-	g.Id = aws.StringValue(secGroupRes.GroupId)
+	g.Id = aws.ToString(secGroupRes.GroupId)
 	groupId = g.Id
 
 	// Add tags to the created security group
-	_, err = g.ec2.CreateTags(&ec2.CreateTagsInput{
-		Resources: []*string{aws.String(groupId)},
-		Tags: []*ec2.Tag{
+	_, err = g.ec2.CreateTags(context.Background(), &ec2.CreateTagsInput{
+		Resources: []string{groupId},
+		Tags: []ec2types.Tag{
 			{
 				Key:   aws.String("Name"),
 				Value: aws.String(g.Name),
@@ -119,11 +101,11 @@ func (g Group) Wait() (err error) {
 	if err != nil {
 		return
 	}
-	err = g.ec2.WaitUntilSecurityGroupExists(&ec2.DescribeSecurityGroupsInput{
-		GroupIds: []*string{
-			aws.String(g.Id),
+	err = ec2.NewSecurityGroupExistsWaiter(g.ec2).Wait(context.Background(), &ec2.DescribeSecurityGroupsInput{
+		GroupIds: []string{
+			g.Id,
 		},
-	})
+	}, 5*time.Minute)
 	return
 }
 
@@ -135,7 +117,7 @@ func (g *Group) Delete() (err error) {
 	if err != nil {
 		return
 	}
-	_, err = g.ec2.DeleteSecurityGroup(&ec2.DeleteSecurityGroupInput{
+	_, err = g.ec2.DeleteSecurityGroup(context.Background(), &ec2.DeleteSecurityGroupInput{
 		GroupId: aws.String(g.Id),
 	})
 	return
@@ -148,12 +130,12 @@ func (g Group) AddBaseAuthorization() (err error) {
 	}
 	input := &ec2.AuthorizeSecurityGroupIngressInput{
 		GroupId: aws.String(g.Id),
-		IpPermissions: []*ec2.IpPermission{
+		IpPermissions: []ec2types.IpPermission{
 			{
-				FromPort:   aws.Int64(22),
+				FromPort:   aws.Int32(22),
 				IpProtocol: aws.String("tcp"),
-				ToPort:     aws.Int64(22),
-				IpRanges: []*ec2.IpRange{
+				ToPort:     aws.Int32(22),
+				IpRanges: []ec2types.IpRange{
 					{
 						CidrIp:      aws.String("0.0.0.0/0"),
 						Description: aws.String("SSH access from everywhere"),
@@ -163,7 +145,7 @@ func (g Group) AddBaseAuthorization() (err error) {
 		},
 	}
 
-	_, err = g.ec2.AuthorizeSecurityGroupIngress(input)
+	_, err = g.ec2.AuthorizeSecurityGroupIngress(context.Background(), input)
 	if err != nil {
 		err = util.CreateError{
 			Text: fmt.Sprintf("Could not add base authorization to security group %s %s.", g.Id, g.Name),
@@ -182,12 +164,12 @@ func (g Group) AddDatabaseAuthorization(serverSgId string) (err error) {
 	}
 	input := &ec2.AuthorizeSecurityGroupIngressInput{
 		GroupId: aws.String(g.Id),
-		IpPermissions: []*ec2.IpPermission{
+		IpPermissions: []ec2types.IpPermission{
 			{
-				FromPort:   aws.Int64(5432),
+				FromPort:   aws.Int32(5432),
 				IpProtocol: aws.String("tcp"),
-				ToPort:     aws.Int64(5432),
-				UserIdGroupPairs: []*ec2.UserIdGroupPair{
+				ToPort:     aws.Int32(5432),
+				UserIdGroupPairs: []ec2types.UserIdGroupPair{
 					{
 						Description: aws.String("Postgresql access from server"),
 						GroupId:     aws.String(serverSgId),
@@ -197,7 +179,7 @@ func (g Group) AddDatabaseAuthorization(serverSgId string) (err error) {
 		},
 	}
 
-	_, err = g.ec2.AuthorizeSecurityGroupIngress(input)
+	_, err = g.ec2.AuthorizeSecurityGroupIngress(context.Background(), input)
 	if err != nil {
 		err = util.CreateError{
 			Text: fmt.Sprintf("Could not add base authorization to security group %s %s.", g.Id, g.Name),
@@ -216,12 +198,12 @@ func (g Group) AddLoadbalancerAuthorization(loadbalancerId string, port int) (er
 	}
 	input := &ec2.AuthorizeSecurityGroupIngressInput{
 		GroupId: aws.String(g.Id),
-		IpPermissions: []*ec2.IpPermission{
+		IpPermissions: []ec2types.IpPermission{
 			{
-				FromPort:   aws.Int64(int64(port)),
+				FromPort:   aws.Int32(int32(port)),
 				IpProtocol: aws.String("tcp"),
-				ToPort:     aws.Int64(int64(port)),
-				UserIdGroupPairs: []*ec2.UserIdGroupPair{
+				ToPort:     aws.Int32(int32(port)),
+				UserIdGroupPairs: []ec2types.UserIdGroupPair{
 					{
 						Description: aws.String("HTTP access from loadbalancer"),
 						GroupId:     aws.String(loadbalancerId),
@@ -231,7 +213,7 @@ func (g Group) AddLoadbalancerAuthorization(loadbalancerId string, port int) (er
 		},
 	}
 
-	_, err = g.ec2.AuthorizeSecurityGroupIngress(input)
+	_, err = g.ec2.AuthorizeSecurityGroupIngress(context.Background(), input)
 	if err != nil {
 		err = util.CreateError{
 			Text: fmt.Sprintf("Could not add service loadbalancer authorization to security group %s %s.", g.Id, g.Name),
@@ -250,12 +232,12 @@ func (g Group) AddServerAccess(sgId string) (err error) {
 	}
 	input := &ec2.AuthorizeSecurityGroupIngressInput{
 		GroupId: aws.String(g.Id),
-		IpPermissions: []*ec2.IpPermission{
+		IpPermissions: []ec2types.IpPermission{
 			{
-				FromPort:   aws.Int64(5432),
+				FromPort:   aws.Int32(5432),
 				IpProtocol: aws.String("tcp"),
-				ToPort:     aws.Int64(5432),
-				UserIdGroupPairs: []*ec2.UserIdGroupPair{
+				ToPort:     aws.Int32(5432),
+				UserIdGroupPairs: []ec2types.UserIdGroupPair{
 					{
 						Description: aws.String("PSQL access from servers in scope: " + g.Scope),
 						GroupId:     aws.String(sgId),
@@ -265,7 +247,7 @@ func (g Group) AddServerAccess(sgId string) (err error) {
 		},
 	}
 
-	_, err = g.ec2.AuthorizeSecurityGroupIngress(input)
+	_, err = g.ec2.AuthorizeSecurityGroupIngress(context.Background(), input)
 	if err != nil {
 		err = util.CreateError{
 			Text: fmt.Sprintf("Could not add PSQL access to security group %s %s.", g.Id, g.Name),
@@ -284,12 +266,12 @@ func (g *Group) AuthorizeHazelcast() (err error) {
 	}
 	input := &ec2.AuthorizeSecurityGroupIngressInput{
 		GroupId: aws.String(g.Id),
-		IpPermissions: []*ec2.IpPermission{
+		IpPermissions: []ec2types.IpPermission{
 			{
-				FromPort:   aws.Int64(5700),
+				FromPort:   aws.Int32(5700),
 				IpProtocol: aws.String("tcp"),
-				ToPort:     aws.Int64(5799),
-				UserIdGroupPairs: []*ec2.UserIdGroupPair{
+				ToPort:     aws.Int32(5799),
+				UserIdGroupPairs: []ec2types.UserIdGroupPair{
 					{
 						Description: aws.String("Hazelcast access"),
 						GroupId:     aws.String(g.Id),
@@ -299,7 +281,7 @@ func (g *Group) AuthorizeHazelcast() (err error) {
 		},
 	}
 
-	_, err = g.ec2.AuthorizeSecurityGroupIngress(input)
+	_, err = g.ec2.AuthorizeSecurityGroupIngress(context.Background(), input)
 	if err != nil {
 		err = util.CreateError{
 			Text: fmt.Sprintf("Could not add Hazelcast authorization to security group %s %s.", g.Id, g.Name),
@@ -311,7 +293,7 @@ func (g *Group) AuthorizeHazelcast() (err error) {
 	return
 }
 
-func (g Group) WithEC2(e *ec2.EC2) Group {
+func (g Group) WithEC2(e *ec2.Client) Group {
 	g.ec2 = e
 	return g
 }

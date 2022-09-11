@@ -1,11 +1,14 @@
 package server
 
 import (
+	"context"
 	"fmt"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"os"
+	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/cantara/nerthus/aws/key"
 	"github.com/cantara/nerthus/aws/security"
 	"github.com/cantara/nerthus/aws/util"
@@ -21,11 +24,11 @@ type Server struct {
 	ImageId            string `json:"image_id"`
 	key                key.Key
 	group              security.Group
-	ec2                *ec2.EC2
+	ec2                *ec2.Client
 	created            bool
 }
 
-func NewServer(name, scope string, key key.Key, group security.Group, e2 *ec2.EC2) (s Server, err error) {
+func NewServer(name, scope string, key key.Key, group security.Group, e2 *ec2.Client) (s Server, err error) {
 	err = util.CheckEC2Session(e2)
 	if err != nil {
 		return
@@ -41,13 +44,13 @@ func NewServer(name, scope string, key key.Key, group security.Group, e2 *ec2.EC
 	return
 }
 
-func GetServer(name, scope string, key key.Key, group security.Group, e2 *ec2.EC2) (s Server, err error) {
-	result, err := e2.DescribeInstances(&ec2.DescribeInstancesInput{
-		Filters: []*ec2.Filter{
+func GetServer(name, scope string, key key.Key, group security.Group, e2 *ec2.Client) (s Server, err error) {
+	result, err := e2.DescribeInstances(context.Background(), &ec2.DescribeInstancesInput{
+		Filters: []ec2types.Filter{
 			{
 				Name: aws.String("tag:Name"),
-				Values: []*string{
-					aws.String(name),
+				Values: []string{
+					name,
 				},
 			},
 		},
@@ -57,17 +60,18 @@ func GetServer(name, scope string, key key.Key, group security.Group, e2 *ec2.EC
 	}
 	if len(result.Reservations) < 1 {
 		err = fmt.Errorf("No servers with name %s", name)
+		return
 	}
 	/* if len(result.Reservations) > 1 {
 		err = fmt.Errorf("Too many servers with name %s", name)
 	} */
 	for _, reservation := range result.Reservations {
 		for _, instance := range reservation.Instances {
-			if aws.StringValue(instance.State.Name) != "running" {
+			if instance.State.Name != ec2types.InstanceStateNameRunning {
 				continue
 			}
 			for _, tag := range instance.Tags {
-				if aws.StringValue(tag.Key) == "Scope" && aws.StringValue(tag.Value) == scope {
+				if aws.ToString(tag.Key) == "Scope" && aws.ToString(tag.Value) == scope {
 					if len(instance.BlockDeviceMappings) < 1 || len(instance.NetworkInterfaces) < 1 {
 						continue
 					}
@@ -76,11 +80,11 @@ func GetServer(name, scope string, key key.Key, group security.Group, e2 *ec2.EC
 						Scope:              scope,
 						key:                key,
 						group:              group,
-						Id:                 aws.StringValue(instance.InstanceId),
-						PublicDNS:          aws.StringValue(instance.PublicDnsName),
-						VolumeId:           aws.StringValue(instance.BlockDeviceMappings[0].Ebs.VolumeId),
-						NetworkInterfaceId: aws.StringValue(instance.NetworkInterfaces[0].NetworkInterfaceId),
-						ImageId:            aws.StringValue(instance.ImageId),
+						Id:                 aws.ToString(instance.InstanceId),
+						PublicDNS:          aws.ToString(instance.PublicDnsName),
+						VolumeId:           aws.ToString(instance.BlockDeviceMappings[0].Ebs.VolumeId),
+						NetworkInterfaceId: aws.ToString(instance.NetworkInterfaces[0].NetworkInterfaceId),
+						ImageId:            aws.ToString(instance.ImageId),
 						ec2:                e2,
 					}
 					return
@@ -92,13 +96,13 @@ func GetServer(name, scope string, key key.Key, group security.Group, e2 *ec2.EC
 	return
 }
 
-func NameAvailable(name string, e2 *ec2.EC2) (available bool, err error) {
-	result, err := e2.DescribeInstances(&ec2.DescribeInstancesInput{
-		Filters: []*ec2.Filter{
+func NameAvailable(name string, e2 *ec2.Client) (available bool, err error) {
+	result, err := e2.DescribeInstances(context.Background(), &ec2.DescribeInstancesInput{
+		Filters: []ec2types.Filter{
 			{
 				Name: aws.String("tag:Name"),
-				Values: []*string{
-					aws.String(name),
+				Values: []string{
+					name,
 				},
 			},
 		},
@@ -108,7 +112,7 @@ func NameAvailable(name string, e2 *ec2.EC2) (available bool, err error) {
 	}
 	for _, reservation := range result.Reservations {
 		for _, instance := range reservation.Instances {
-			if aws.StringValue(instance.State.Name) == "terminated" {
+			if instance.State.Name == ec2types.InstanceStateNameTerminated {
 				continue
 			}
 			available = false
@@ -121,26 +125,26 @@ func NameAvailable(name string, e2 *ec2.EC2) (available bool, err error) {
 
 func (s *Server) Create() (id string, err error) {
 	// Specify the details of the instance that you want to create
-	result, err := s.ec2.RunInstances(&ec2.RunInstancesInput{
+	result, err := s.ec2.RunInstances(context.Background(), &ec2.RunInstancesInput{
 		ImageId:          aws.String(s.ImageId), //ami-0142f6ace1c558c7d"),
-		InstanceType:     aws.String("t3.micro"),
-		MinCount:         aws.Int64(1),
-		MaxCount:         aws.Int64(1),
-		SecurityGroupIds: aws.StringSlice([]string{s.group.Id}),
+		InstanceType:     "t3.micro",
+		MinCount:         aws.Int32(1),
+		MaxCount:         aws.Int32(1),
+		SecurityGroupIds: []string{s.group.Id},
 		KeyName:          aws.String(s.key.Name),
-		BlockDeviceMappings: []*ec2.BlockDeviceMapping{
+		BlockDeviceMappings: []ec2types.BlockDeviceMapping{
 			{
 				DeviceName: aws.String("/dev/xvda"),
-				Ebs: &ec2.EbsBlockDevice{
-					VolumeSize: aws.Int64(20),
-					VolumeType: aws.String("gp3"),
+				Ebs: &ec2types.EbsBlockDevice{
+					VolumeSize: aws.Int32(20),
+					VolumeType: "gp3",
 				},
 			},
 		},
-		TagSpecifications: []*ec2.TagSpecification{
+		TagSpecifications: []ec2types.TagSpecification{
 			{
-				ResourceType: aws.String("instance"),
-				Tags: []*ec2.Tag{
+				ResourceType: "instance",
+				Tags: []ec2types.Tag{
 					{
 						Key:   aws.String("Name"),
 						Value: aws.String(s.Name),
@@ -152,8 +156,8 @@ func (s *Server) Create() (id string, err error) {
 				},
 			},
 			{
-				ResourceType: aws.String("volume"),
-				Tags: []*ec2.Tag{
+				ResourceType: "volume",
+				Tags: []ec2types.Tag{
 					{
 						Key:   aws.String("Name"),
 						Value: aws.String(s.Name),
@@ -173,9 +177,9 @@ func (s *Server) Create() (id string, err error) {
 		}
 		return
 	}
-	s.Id = aws.StringValue(result.Instances[0].InstanceId)
-	s.NetworkInterfaceId = aws.StringValue(result.Instances[0].NetworkInterfaces[0].NetworkInterfaceId)
-	//s.VolumeId = aws.StringValue(result.Instances[0].BlockDeviceMappings[0].Ebs.VolumeId)
+	s.Id = aws.ToString(result.Instances[0].InstanceId)
+	s.NetworkInterfaceId = aws.ToString(result.Instances[0].NetworkInterfaces[0].NetworkInterfaceId)
+	//s.VolumeId = aws.ToString(result.Instances[0].BlockDeviceMappings[0].Ebs.VolumeId)
 	id = s.Id
 	s.created = true
 	return
@@ -189,22 +193,22 @@ func (s *Server) Delete() (err error) {
 	if err != nil {
 		return
 	}
-	_, err = s.ec2.TerminateInstances(&ec2.TerminateInstancesInput{
-		InstanceIds: []*string{
-			aws.String(s.Id),
+	_, err = s.ec2.TerminateInstances(context.Background(), &ec2.TerminateInstancesInput{
+		InstanceIds: []string{
+			s.Id,
 		},
 	})
 	if err != nil {
 		return
 	}
-	s.WaitUntilTerminated()
+	err = s.WaitUntilTerminated()
 	return
 }
 
 func (s Server) WaitUntilRunning() (err error) {
-	err = s.ec2.WaitUntilInstanceRunning(&ec2.DescribeInstancesInput{
-		InstanceIds: []*string{aws.String(s.Id)},
-	})
+	err = ec2.NewInstanceRunningWaiter(s.ec2).Wait(context.Background(), &ec2.DescribeInstancesInput{
+		InstanceIds: []string{s.Id},
+	}, 5*time.Minute)
 	if err != nil {
 		return
 	}
@@ -212,16 +216,16 @@ func (s Server) WaitUntilRunning() (err error) {
 }
 
 func (s Server) WaitUntilTerminated() (err error) {
-	err = s.ec2.WaitUntilInstanceTerminated(&ec2.DescribeInstancesInput{
-		InstanceIds: []*string{aws.String(s.Id)},
-	})
+	err = ec2.NewInstanceTerminatedWaiter(s.ec2).Wait(context.Background(), &ec2.DescribeInstancesInput{
+		InstanceIds: []string{s.Id},
+	}, 5*time.Minute)
 	return
 }
 
 func (s Server) WaitUntilNetworkAvailable() (err error) {
-	err = s.ec2.WaitUntilNetworkInterfaceAvailable(&ec2.DescribeNetworkInterfacesInput{
-		NetworkInterfaceIds: []*string{aws.String(s.NetworkInterfaceId)},
-	})
+	err = ec2.NewNetworkInterfaceAvailableWaiter(s.ec2).Wait(context.Background(), &ec2.DescribeNetworkInterfacesInput{
+		NetworkInterfaceIds: []string{s.NetworkInterfaceId},
+	}, 5*time.Minute)
 	return
 }
 
@@ -230,8 +234,8 @@ func (s *Server) GetPublicDNS() (publicDNS string, err error) {
 		publicDNS = s.PublicDNS
 		return
 	}
-	result, err := s.ec2.DescribeInstances(&ec2.DescribeInstancesInput{
-		InstanceIds: []*string{aws.String(s.Id)},
+	result, err := s.ec2.DescribeInstances(context.Background(), &ec2.DescribeInstancesInput{
+		InstanceIds: []string{s.Id},
 	})
 	if err != nil {
 		err = util.CreateError{
@@ -240,7 +244,7 @@ func (s *Server) GetPublicDNS() (publicDNS string, err error) {
 		}
 		return
 	}
-	s.PublicDNS = aws.StringValue(result.Reservations[0].Instances[0].PublicDnsName)
+	s.PublicDNS = aws.ToString(result.Reservations[0].Instances[0].PublicDnsName)
 	publicDNS = s.PublicDNS
 	return
 }
@@ -250,8 +254,8 @@ func (s *Server) GetVolumeId() (volumeId string, err error) {
 		volumeId = s.VolumeId
 		return
 	}
-	result, err := s.ec2.DescribeInstances(&ec2.DescribeInstancesInput{
-		InstanceIds: []*string{aws.String(s.Id)},
+	result, err := s.ec2.DescribeInstances(context.Background(), &ec2.DescribeInstancesInput{
+		InstanceIds: []string{s.Id},
 	})
 	if err != nil {
 		err = util.CreateError{
@@ -260,7 +264,7 @@ func (s *Server) GetVolumeId() (volumeId string, err error) {
 		}
 		return
 	}
-	s.VolumeId = aws.StringValue(result.Reservations[0].Instances[0].BlockDeviceMappings[0].Ebs.VolumeId)
+	s.VolumeId = aws.ToString(result.Reservations[0].Instances[0].BlockDeviceMappings[0].Ebs.VolumeId)
 	volumeId = s.VolumeId
 	return
 }

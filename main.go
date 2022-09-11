@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -9,8 +10,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go-v2/config"
 	log "github.com/cantara/bragi"
 	cloud "github.com/cantara/nerthus/aws"
 	"github.com/cantara/nerthus/aws/loadbalancer"
@@ -50,12 +50,10 @@ func main() {
 	crypto.InitCrypto()
 	since := time.Now()
 
-	region := os.Getenv("region") //"us-west-2" //"eu-central-1"
+	//region := os.Getenv("region") //"us-west-2" //"eu-central-1"
 	// Initialize a session in us-west-2 that the SDK will use to load
 	// credentials from the shared credentials file ~/.aws/credentials.
-	sess, err := session.NewSession(&aws.Config{
-		Region: aws.String(region)},
-	)
+	sess, err := config.LoadDefaultConfig(context.TODO())
 	if err != nil {
 		log.AddError(err).Fatal("While creating aws session")
 	}

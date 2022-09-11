@@ -1,9 +1,8 @@
 package tag
 
 import (
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/aws/aws-sdk-go/service/elbv2"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 	"github.com/cantara/nerthus/aws/util"
 )
 
@@ -27,7 +26,7 @@ type New struct {
 
 func NewNewTag(serviceName, scope, keyId, securityGroupId, serverId, volumeId, networkInterfaceId, imageId,
 	targetGroupARN, ruleARN, listnerARN, loadbalancerARN string,
-	e2 *ec2.EC2, el *elbv2.ELBV2) (t New, err error) {
+	e2 *ec2.Client, el *elbv2.Client) (t New, err error) {
 
 	err = util.CheckEC2Session(e2)
 	if err != nil {
@@ -51,19 +50,19 @@ func NewNewTag(serviceName, scope, keyId, securityGroupId, serverId, volumeId, n
 		ListenerARN:        listnerARN,
 		LoadbalancerARN:    loadbalancerARN,
 		tag: &tag{
-			ec2Resources: []*string{
-				aws.String(keyId),
-				aws.String(securityGroupId),
-				aws.String(serverId),
-				aws.String(networkInterfaceId),
-				aws.String(volumeId),
-				aws.String(imageId),
+			ec2Resources: []string{
+				keyId,
+				securityGroupId,
+				serverId,
+				networkInterfaceId,
+				volumeId,
+				imageId,
 			},
-			elbResources: []*string{
-				aws.String(targetGroupARN),
-				aws.String(ruleARN),
-				aws.String(listnerARN),
-				aws.String(loadbalancerARN),
+			elbResources: []string{
+				targetGroupARN,
+				ruleARN,
+				listnerARN,
+				loadbalancerARN,
 			},
 			Key:   serviceName,
 			Value: scope,

@@ -1,8 +1,7 @@
 package tag
 
 import (
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/cantara/nerthus/aws/util"
 )
 
@@ -14,11 +13,11 @@ type additional struct {
 	NetworkInterfaceId string `json:"network_interface_id"`
 	ImageId            string `json:"image_id"`
 	tag                *tag
-	ec2                *ec2.EC2
+	ec2                *ec2.Client
 	created            bool
 }
 
-func NewAddTag(serviceName, scope, serverId, networkInterfaceId, volumeId, imageId string, e2 *ec2.EC2) (t additional, err error) {
+func NewAddTag(serviceName, scope, serverId, networkInterfaceId, volumeId, imageId string, e2 *ec2.Client) (t additional, err error) {
 	err = util.CheckEC2Session(e2)
 	if err != nil {
 		return
@@ -31,10 +30,10 @@ func NewAddTag(serviceName, scope, serverId, networkInterfaceId, volumeId, image
 		NetworkInterfaceId: networkInterfaceId,
 		ImageId:            imageId,
 		tag: &tag{
-			ec2Resources: []*string{
-				aws.String(serverId),
-				aws.String(networkInterfaceId),
-				aws.String(volumeId),
+			ec2Resources: []string{
+				serverId,
+				networkInterfaceId,
+				volumeId,
 				//aws.String(t.ImageId),
 			},
 			Key:   serviceName,
