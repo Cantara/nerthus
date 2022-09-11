@@ -1,0 +1,11 @@
+Exite from this prosidure once a valid cert is selected
+
+1. Get a domain name or trigger a List of all certs
+1.2. Check if domain name has a availabele cert
+No cert:
+2. Get intnded domain name for cert. (*.example.com is an option here.)
+3. Request cert
+4. Discribe cert and get DNS cname info
+5. Loop and wait for discribe cert to return a valid cert. Timeout after 2 hours with a incrimental polling loop.
+5.1. Cleanup on failiure.
+6. Select cert or move to step 1. (Intended behaviour here needs to be thought about.)
