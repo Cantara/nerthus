@@ -57,6 +57,7 @@ func main() {
 	if err != nil {
 		log.AddError(err).Fatal("While creating aws session")
 	}
+	sess.Region = os.Getenv("region")
 
 	var c cloud.AWS
 	// Create an EC2 service client.
