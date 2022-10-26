@@ -3,7 +3,7 @@ module github.com/cantara/nerthus
 go 1.19
 
 require (
-	github.com/aws/aws-sdk-go v1.44.123
+	github.com/aws/aws-sdk-go v1.44.124
 	github.com/aws/aws-sdk-go-v2 v1.17.1
 	github.com/aws/aws-sdk-go-v2/config v1.17.10
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.63.3
