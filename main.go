@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/cantara/nerthus/aws/metadata"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -66,6 +67,20 @@ func main() {
 	c.NewELB(sess)
 	// Create an rds service client.
 	c.NewRDS(sess)
+
+	ids, err := metadata.GetAllServersWithMetadataV1IDs(c.GetEC2())
+	if err != nil {
+		log.AddError(err).Fatal("while getting all server ids")
+		return
+	}
+	log.Println(ids)
+	for _, id := range ids {
+		err = metadata.SetMetadataV2(id, c.GetEC2())
+		if err != nil {
+			log.AddError(err).Fatal("while setting server ", id, " metadata to version 2, ABORTING")
+			return
+		}
+	}
 
 	r := gin.Default()
 	config := cors.DefaultConfig()

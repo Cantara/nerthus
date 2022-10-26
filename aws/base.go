@@ -35,8 +35,16 @@ type AWS struct {
 	rds *rds.Client
 }
 
+func (a AWS) GetEC2() *ec2.Client {
+	return a.ec2
+}
+
 func (a AWS) GetELB() *elbv2.Client {
 	return a.elb
+}
+
+func (a AWS) GetRDS() *rds.Client {
+	return a.rds
 }
 
 func (a *AWS) NewEC2(c aws.Config) {
