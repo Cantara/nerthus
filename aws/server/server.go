@@ -141,6 +141,9 @@ func (s *Server) Create() (id string, err error) {
 				},
 			},
 		},
+		MetadataOptions: &ec2types.InstanceMetadataOptionsRequest{
+			HttpTokens: ec2types.HttpTokensStateRequired,
+		},
 		TagSpecifications: []ec2types.TagSpecification{
 			{
 				ResourceType: "instance",
