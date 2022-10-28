@@ -3,12 +3,12 @@ package server
 import (
 	"context"
 	"fmt"
-	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"os"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/cantara/nerthus/aws/key"
 	"github.com/cantara/nerthus/aws/security"
 	"github.com/cantara/nerthus/aws/util"

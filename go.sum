@@ -1,7 +1,3 @@
-github.com/aws/aws-sdk-go v1.44.123 h1:+vVGJ7+vQU6/wRcgRwSBBrIuG/lLL/0LB3HlN5jFv3c=
-github.com/aws/aws-sdk-go v1.44.123/go.mod h1:y4AeaBuwd2Lk+GepC1E9v0qOiTws0MIWAX4oIKwKHZo=
-github.com/aws/aws-sdk-go v1.44.124 h1:Xe1WQRUUekZf6ZFm3SD0vplB/AP/hymVqMiRS9LQRIs=
-github.com/aws/aws-sdk-go v1.44.124/go.mod h1:y4AeaBuwd2Lk+GepC1E9v0qOiTws0MIWAX4oIKwKHZo=
 github.com/aws/aws-sdk-go v1.44.125 h1:yIyCs6HX1BOj6SFTirvBwVM1tTfplKrJOyilIZPtKV8=
 github.com/aws/aws-sdk-go v1.44.125/go.mod h1:y4AeaBuwd2Lk+GepC1E9v0qOiTws0MIWAX4oIKwKHZo=
 github.com/aws/aws-sdk-go-v2 v1.17.1 h1:02c72fDJr87N8RAC2s3Qu0YuvMRZKNZJ9F+lAehCazk=
@@ -18,8 +14,6 @@ github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.4.19 h1:oRHDrwCTVT8ZXi4sr9
 github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.4.19/go.mod h1:6Q0546uHDp421okhmmGfbxzq2hBqbXFNpi4k+Q1JnQA=
 github.com/aws/aws-sdk-go-v2/internal/ini v1.3.26 h1:Mza+vlnZr+fPKFKRq/lKGVvM6B/8ZZmNdEopOwSQLms=
 github.com/aws/aws-sdk-go-v2/internal/ini v1.3.26/go.mod h1:Y2OJ+P+MC1u1VKnavT+PshiEuGPyh/7DqxoDNij4/bg=
-github.com/aws/aws-sdk-go-v2/service/ec2 v1.63.3 h1:+UHyeFhdPddRB+EkgeaKMutWiqwWrj3FIQUif3VnalM=
-github.com/aws/aws-sdk-go-v2/service/ec2 v1.63.3/go.mod h1:zul71QqzR4D1a90/5FloZiAnZ1CtuIjVH7R9MP997+A=
 github.com/aws/aws-sdk-go-v2/service/ec2 v1.64.0 h1:zI904mHbXiJgIc5bwpo5jOk1+wDvcX04PyYd2dInh/4=
 github.com/aws/aws-sdk-go-v2/service/ec2 v1.64.0/go.mod h1:zul71QqzR4D1a90/5FloZiAnZ1CtuIjVH7R9MP997+A=
 github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2 v1.18.22 h1:EbYXWwuQAoT2Wtc9LC+n0cQiSokCB8em/8T0dtPowos=
@@ -38,6 +32,8 @@ github.com/aws/smithy-go v1.13.4 h1:/RN2z1txIJWeXeOkzX+Hk/4Uuvv7dWtCjbmVJcrskyk=
 github.com/aws/smithy-go v1.13.4/go.mod h1:Tg+OJXh4MB2R/uN61Ko2f6hTZwB/ZYGOtib8J3gBHzA=
 github.com/cantara/bragi v0.5.4 h1:Tr0gZ01SwJYX1IvOAVErNY7Zc+bAFzarCde8WRqRxBE=
 github.com/cantara/bragi v0.5.4/go.mod h1:UG6GZBNRGKiMkl2EwlKMQ1tWj2l/9bcXSIzG1b/jVC8=
+github.com/cantara/nerthus v0.6.3 h1:kSmOzNCbEkPsTWWDKtkA2emdM9EF8obKhxlO0uejQkE=
+github.com/cantara/nerthus v0.6.3/go.mod h1:rs7Phn2ZoqFKHHlNuvQJGYXkszCzip9tjyUQB6eQ7wA=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=

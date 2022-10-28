@@ -32,6 +32,7 @@ $: {
 
 <Dropdown bind:open>
   <Input bind:required downarrow bind:label value={value.name} slot="trigger"/>
+  {#if values}
   <span>
     <ul class="droplist">
       {#each values as val}
@@ -39,15 +40,18 @@ $: {
         <hr>
         <nobr><p>{val.name}</p></nobr>
         <ul class="horizontal">
-        {#each val.extras as extra}
-          <li>{extra}</li>
-        {/each}
+          {#if val.extras}
+            {#each val.extras as extra}
+              <li>{extra}</li>
+            {/each}
+          {/if}
         </ul>
       </li>
       {/each}
       <hr>
-   </ul>
+    </ul>
   </span>
+  {/if}
 </Dropdown>
 
 <style scoped>
