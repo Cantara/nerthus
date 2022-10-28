@@ -39,13 +39,13 @@ $: {
       <li on:click={() => {value = val; open = false}}>
         <hr>
         <nobr><p>{val.name}</p></nobr>
-        <ul class="horizontal">
-          {#if val.extras}
+        {#if val.extras}
+          <ul class="horizontal">
             {#each val.extras as extra}
               <li>{extra}</li>
             {/each}
-          {/if}
-        </ul>
+          </ul>
+        {/if}
       </li>
       {/each}
       <hr>
