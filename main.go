@@ -54,11 +54,17 @@ func main() {
 	//region := os.Getenv("region") //"us-west-2" //"eu-central-1"
 	// Initialize a session in us-west-2 that the SDK will use to load
 	// credentials from the shared credentials file ~/.aws/credentials.
-	sess, err := config.LoadDefaultConfig(context.TODO())
+	var opts []func(*config.LoadOptions) error
+	if os.Getenv("aws.profile") != "" {
+		opts = append(opts, config.WithSharedConfigProfile(os.Getenv("aws.profile")))
+	} else {
+		opts = append(opts, config.WithDefaultRegion(os.Getenv("region")))
+	}
+	sess, err := config.LoadDefaultConfig(context.TODO(), opts...,
+	)
 	if err != nil {
 		log.AddError(err).Fatal("While creating aws session")
 	}
-	sess.Region = os.Getenv("region")
 
 	var c cloud.AWS
 	// Create an EC2 service client.
@@ -86,11 +92,15 @@ func main() {
 	config := cors.DefaultConfig()
 	config.AllowOrigins = []string{"*"}
 	r.Use(cors.New(config))
-	base := r.Group("/nerthus")
+	basePath := ""
+	if os.Getenv("run_as_base") != "true" {
+		basePath = "/nerthus"
+	}
+	base := r.Group(basePath)
 
-	dash := base.Group("/") //Might need to be in subdir dash
+	dash := base.Group("")
 	{
-		dash.StaticFile("/", "./frontend"+os.Getenv("frontend_path")+"/index.html")
+		dash.StaticFile("", "./frontend"+os.Getenv("frontend_path")+"/index.html")
 		dash.StaticFile("/global.css", "./frontend"+os.Getenv("frontend_path")+"/global.css")
 		dash.StaticFile("/favicon.png", "./frontend"+os.Getenv("frontend_path")+"/favicon.png")
 		dash.StaticFS("/build", http.Dir("./frontend"+os.Getenv("frontend_path")+"/build"))
