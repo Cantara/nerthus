@@ -144,7 +144,7 @@ func (c AWS) AddServerToScope(scope, serverName string, v vpclib.VPC, k key.Key,
 	return
 }
 
-func (c AWS) CreateDatabase(scope, artifactId string, v vpclib.VPC, sg security.Group, slackId string) (cryptData string) {
+func (c AWS) CreateDatabase(scope, artifactId string, v vpclib.VPC, sg security.Group, slackId string) (endpoint string) {
 	seq := sequence{
 		ec2:           c.ec2,
 		rds:           c.rds,
@@ -163,7 +163,7 @@ func (c AWS) CreateDatabase(scope, artifactId string, v vpclib.VPC, sg security.
 
 	seq.SendDBSettup()
 	seq.FinishedAllOpperations()
-	cryptData = seq.cryptData
+	endpoint = seq.database.Endpoint
 	return
 }
 

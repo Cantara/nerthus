@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
@@ -43,6 +44,74 @@ func NewDatabase(database, scope string, group security.Group, db *rds.Client) (
 
 func (d *Database) Create() (arn string, err error) {
 	// Specify the details of the instance that you want to create
+	result, err := d.rds.CreateDBInstance(context.Background(), &rds.CreateDBInstanceInput{
+		BackupRetentionPeriod:   aws.Int32(7),
+		AllocatedStorage:        aws.Int32(8),
+		DBInstanceIdentifier:    aws.String(d.Name),
+		DBInstanceClass:         aws.String("db.t3.micro"),
+		DBName:                  aws.String(d.Database),
+		Engine:                  aws.String("postgres"),
+		EngineVersion:           aws.String("13.4"),
+		MasterUserPassword:      aws.String(d.Password),
+		MasterUsername:          aws.String(d.Database),
+		Port:                    aws.Int32(5432),
+		AutoMinorVersionUpgrade: aws.Bool(true),
+		StorageEncrypted:        aws.Bool(true),
+		PubliclyAccessible:      aws.Bool(false),
+		Tags: []rdstypes.Tag{
+			{
+				Key:   aws.String("Name"),
+				Value: aws.String(d.Name),
+			},
+			{
+				Key:   aws.String("Scope"),
+				Value: aws.String(d.Scope),
+			},
+		},
+	})
+	if err != nil {
+		err = util.CreateError{
+			Text: fmt.Sprintf("Could not create database with name %s.", d.Name),
+			Err:  err,
+		}
+		return
+	}
+	d.ARN = aws.ToString(result.DBInstance.DBInstanceArn)
+	d.Endpoint, err = d.GetEndpoints(d.Name)
+	if err != nil {
+		return
+	}
+	fmt.Println(d.Endpoint)
+	arn = d.ARN
+	d.created = true
+	return
+}
+
+func (d *Database) GetEndpoints(identifier string) (endpoint string, err error) {
+	result, err := d.rds.DescribeDBInstances(context.Background(), &rds.DescribeDBInstancesInput{
+		DBInstanceIdentifier: aws.String(identifier),
+	})
+	if err != nil {
+		return
+	}
+	i := 1
+	for result.DBInstances[0].Endpoint == nil {
+		time.Sleep(30 * time.Second * time.Duration(i))
+		result, err = d.rds.DescribeDBInstances(context.Background(), &rds.DescribeDBInstancesInput{
+			DBInstanceIdentifier: aws.String(identifier),
+		})
+		if err != nil {
+			return
+		}
+		i++
+	}
+	endpoint = aws.ToString(result.DBInstances[0].Endpoint.Address)
+	return
+}
+
+/*
+func (d *Database) Create() (arn string, err error) {
+	// Specify the details of the instance that you want to create
 	result, err := d.rds.CreateDBCluster(context.Background(), &rds.CreateDBClusterInput{
 		BackupRetentionPeriod:   aws.Int32(7),
 		AllocatedStorage:        aws.Int32(8),
@@ -81,6 +150,7 @@ func (d *Database) Create() (arn string, err error) {
 	d.created = true
 	return
 }
+*/
 
 func (d *Database) Delete() (err error) {
 	if !d.created {

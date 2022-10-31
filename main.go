@@ -370,16 +370,16 @@ func newDatabaseInScopeHandler(cld *cloud.AWS) func(*gin.Context) {
 		if cryptScope != scope {
 			log.Fatal("Scope in cryptodata and provided scope are different")
 		}
-		crypData := cld.CreateDatabase(scope, artifactId, v, sg, slackId)
-		if crypData == "" {
+		endpoint := cld.CreateDatabase(scope, artifactId, v, sg, slackId)
+		if endpoint == "" {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"message": "Something wend wrong while creating database",
 			})
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{
-			"message": "Database successfully created",
-			"key":     crypData,
+			"message":  "Database successfully created",
+			"endpoint": endpoint,
 		})
 	}
 }
