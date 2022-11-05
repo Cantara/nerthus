@@ -47,6 +47,7 @@ func GetOutboundIP() net.IP {
 
 func main() {
 	loadEnv()
+	//log.SetOutputFolder()
 	slack.NewClient(os.Getenv("slack_token"), os.Getenv("slack_channel_secret"), os.Getenv("slack_channel_status"), os.Getenv("slack_channel_commands"))
 	crypto.InitCrypto()
 	since := time.Now()
@@ -88,10 +89,15 @@ func main() {
 		}
 	}
 
-	r := gin.Default()
-	config := cors.DefaultConfig()
-	config.AllowOrigins = []string{"*"}
-	r.Use(cors.New(config))
+	r := gin.New()
+	r.Use(gin.LoggerWithConfig(gin.LoggerConfig{
+		SkipPaths: []string{"/nerthus/health"},
+	}))
+	r.Use(gin.Recovery())
+
+	cConfig := cors.DefaultConfig()
+	cConfig.AllowOrigins = []string{"*"}
+	r.Use(cors.New(cConfig))
 	basePath := ""
 	if os.Getenv("run_as_base") != "true" {
 		basePath = "/nerthus"

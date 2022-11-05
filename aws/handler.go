@@ -304,7 +304,7 @@ func (c *sequence) CreateDBSecurityGroup(artifactId string) {
 	securityGroup, err := securitylib.NewDBGroup(servershlib.ToFriendlyName(artifactId), c.scope, c.vpc, c.ec2)
 	_, err = securityGroup.Create()
 	if err != nil {
-		log.AddError(err).Fatal("While creating security group")
+		log.AddError(err).Fatal("while creating security group")
 	}
 	c.deleters.Push(cleanup("Security group", "while deleting created security group",
 		&securityGroup))
