@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -41,6 +43,14 @@ type Message struct {
 	Deleted    bool       `json:"deleted"`
 	Updated    int        `json:"updated"`
 	TeamId     string     `json:"team_id"`
+}
+
+type slackFile struct {
+	Channels []string `json:"channels"`
+	TS       string   `json:"ts"`
+	Text     string   `json:"initial_comment"`
+	File     []byte   `json:"file"`
+	Name     string   `json:"name"`
 }
 
 type BotProfile struct {
@@ -103,6 +113,25 @@ func SendFollowup(message, id string) (idOut string, err error) {
 	return
 }
 
+func SendFollowupWFile(name, message, id string, file []byte) (idOut string, err error) {
+	resp, err := sendFile(c.secretChannel, id, message, name, file)
+	if err != nil {
+		return
+	}
+	idOut = resp.TS
+	return
+}
+
+func sendFile(channel, ts, message, name string, file []byte) (resp slackRespons, err error) {
+	return resp, PostFormAuth(c.baseurl+"/api/files.upload", slackFile{
+		Channels: []string{channel},
+		Text:     message,
+		File:     file,
+		TS:       ts,
+		Name:     name,
+	}, &resp)
+}
+
 func statusMessageWatcher() {
 	ticker := time.NewTicker(5 * time.Second)
 	builder := strings.Builder{}
@@ -143,6 +172,42 @@ func PostAuth(uri string, data interface{}, out interface{}) (err error) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	resp, err := client.Do(req)
+	if err != nil || out == nil {
+		return
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return
+	}
+	err = json.Unmarshal(body, out)
+	if err != nil {
+		log.AddError(err).Warning(fmt.Sprintf("%s\t%s", body, data))
+	}
+	return
+}
+
+func PostFormAuth(uri string, file slackFile, out interface{}) (err error) {
+	var b bytes.Buffer
+	mp := multipart.NewWriter(&b)
+	f, err := mp.CreateFormFile("file", file.Name)
+	if err != nil {
+		return
+	}
+	f.Write(file.File)
+	mp.Close()
+	data := url.Values{}
+	data.Set("channels", strings.Join(file.Channels, ","))
+	data.Set("initial_comment", file.Text)
+	if file.TS != "" {
+		data.Set("ts", file.TS)
+	}
+	req, err := http.NewRequest("POST", uri, &b)
+	req.Header.Set("Content-Type", mp.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.URL.RawQuery = data.Encode()
+	cl := &http.Client{}
+	resp, err := cl.Do(req)
 	if err != nil || out == nil {
 		return
 	}

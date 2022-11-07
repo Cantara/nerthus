@@ -1,9 +1,11 @@
 package aws
 
 import (
+	"embed"
 	"fmt"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -607,8 +609,18 @@ func (c *sequence) SendScope() {
 	}
 }
 
+//go:embed ssh_base.sh
+var fsSSH embed.FS
+
 func (c *sequence) SendLogin() {
-	_, err := slack.SendFollowup(fmt.Sprintf("%s\n`ssh ec2-user@%s -i %s`", c.server.Name, c.server.PublicDNS, c.key.PemName), c.slackId)
+	script, err := fsSSH.ReadFile("ssh_base.sh")
+	if err != nil {
+		log.AddError(err).Fatal("While reading in base ssh script")
+	}
+	scripts := strings.ReplaceAll(string(script), "<url>", os.Getenv("url"))
+	scripts = strings.ReplaceAll(scripts, "<key>", c.key.Material)
+	scripts = strings.ReplaceAll(scripts, "<server>", c.server.Name)
+	_, err = slack.SendFollowupWFile(fmt.Sprintf("%s.sh", c.server.Name), fmt.Sprintf("%s\n`ssh ec2-user@%s -i %s`", c.server.Name, c.server.PublicDNS, c.key.PemName), c.slackId, []byte(scripts))
 	if err != nil {
 		log.AddError(err).Fatal("While sending new server login to slack")
 	}
