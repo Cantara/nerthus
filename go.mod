@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.17.1
-	github.com/aws/aws-sdk-go-v2/config v1.18.0
+	github.com/aws/aws-sdk-go-v2/config v1.18.1
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.70.0
 	github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2 v1.18.23
 	github.com/aws/aws-sdk-go-v2/service/iam v1.18.23
@@ -17,7 +17,7 @@ require (
 )
 
 require (
-	github.com/aws/aws-sdk-go-v2/credentials v1.13.0 // indirect
+	github.com/aws/aws-sdk-go-v2/credentials v1.13.1 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.12.19 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.1.25 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.4.19 // indirect
@@ -25,7 +25,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.9.19 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.11.25 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.13.8 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sts v1.17.2 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sts v1.17.3 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect
 	github.com/go-playground/locales v0.14.0 // indirect
 	github.com/go-playground/universal-translator v0.18.0 // indirect
