@@ -10,7 +10,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/iam v1.19.3
 	github.com/aws/aws-sdk-go-v2/service/rds v1.40.4
 	github.com/aws/smithy-go v1.13.5
-	github.com/cantara/bragi v0.6.3
+	github.com/cantara/bragi v0.6.4
 	github.com/gin-contrib/cors v1.4.0
 	github.com/gin-gonic/gin v1.9.0
 	github.com/joho/godotenv v1.5.1
