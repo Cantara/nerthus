@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/aws/aws-sdk-go-v2 v1.18.1
 	github.com/aws/aws-sdk-go-v2/config v1.18.26
-	github.com/aws/aws-sdk-go-v2/service/ec2 v1.99.0
+	github.com/aws/aws-sdk-go-v2/service/ec2 v1.100.0
 	github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2 v1.19.12
 	github.com/aws/aws-sdk-go-v2/service/iam v1.20.1
 	github.com/aws/aws-sdk-go-v2/service/rds v1.45.1
