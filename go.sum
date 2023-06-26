@@ -392,6 +392,8 @@ github.com/aws/aws-sdk-go-v2/service/iam v1.20.2 h1:ZR0W8HrZ2QnBuwJzPTtR1cMVrNxo
 github.com/aws/aws-sdk-go-v2/service/iam v1.20.2/go.mod h1:aQZ8BI+reeaY7RI/QQp7TKCSUHOesTdrzzylp3CW85c=
 github.com/aws/aws-sdk-go-v2/service/iam v1.20.3 h1:oO895XrrD1khVUv0fUFTpbvCK+/IS9nnlhie5WYXPgw=
 github.com/aws/aws-sdk-go-v2/service/iam v1.20.3/go.mod h1:aQZ8BI+reeaY7RI/QQp7TKCSUHOesTdrzzylp3CW85c=
+github.com/aws/aws-sdk-go-v2/service/iam v1.21.0 h1:8hEpu60CWlrp7iEBUFRZhgPoX6+gadaGL1sD4LoRYS0=
+github.com/aws/aws-sdk-go-v2/service/iam v1.21.0/go.mod h1:aQZ8BI+reeaY7RI/QQp7TKCSUHOesTdrzzylp3CW85c=
 github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.9.19 h1:GE25AWCdNUPh9AOJzI9KIJnja7IwUc1WyUqz/JTyJ/I=
 github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.9.19/go.mod h1:02CP6iuYP+IVnBX5HULVdSAku/85eHB2Y9EsFhrkEwU=
 github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.9.20 h1:jlgyHbkZQAgAc7VIxJDmtouH8eNjOk2REVAQfVhdaiQ=
