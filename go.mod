@@ -3,13 +3,13 @@ module github.com/cantara/nerthus
 go 1.19
 
 require (
-	github.com/aws/aws-sdk-go-v2 v1.20.2
+	github.com/aws/aws-sdk-go-v2 v1.20.3
 	github.com/aws/aws-sdk-go-v2/config v1.18.34
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.113.0
 	github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2 v1.21.1
 	github.com/aws/aws-sdk-go-v2/service/iam v1.22.3
 	github.com/aws/aws-sdk-go-v2/service/rds v1.50.2
-	github.com/aws/smithy-go v1.14.1
+	github.com/aws/smithy-go v1.14.2
 	github.com/cantara/bragi v0.6.9
 	github.com/gin-contrib/cors v1.4.0
 	github.com/gin-gonic/gin v1.9.1
