@@ -926,6 +926,8 @@ github.com/aws/aws-sdk-go-v2/service/rds v1.62.1 h1:ljC3RuvdNuK5LEadnRg+N9do6HU6
 github.com/aws/aws-sdk-go-v2/service/rds v1.62.1/go.mod h1:FQ4Zcy+chmZ97DoLyfn1TExjeU/KsR0/Fycl9bEBCtQ=
 github.com/aws/aws-sdk-go-v2/service/rds v1.62.2 h1:KShD7GrMvSnwKsDQxRQTOGOrDyj2wrA+0SP9FBPtxHQ=
 github.com/aws/aws-sdk-go-v2/service/rds v1.62.2/go.mod h1:T++jZU+TJQEq8rMssEmjOW4/VRai5VcqxPAQqPBE26k=
+github.com/aws/aws-sdk-go-v2/service/rds v1.62.3 h1:eXWDu7PodivDkEnbLw6KqL3zgcLha22fDdsNhqcBXLM=
+github.com/aws/aws-sdk-go-v2/service/rds v1.62.3/go.mod h1:T++jZU+TJQEq8rMssEmjOW4/VRai5VcqxPAQqPBE26k=
 github.com/aws/aws-sdk-go-v2/service/sso v1.11.25 h1:GFZitO48N/7EsFDt8fMa5iYdmWqkUDDB3Eje6z3kbG0=
 github.com/aws/aws-sdk-go-v2/service/sso v1.11.25/go.mod h1:IARHuzTXmj1C0KS35vboR0FeJ89OkEy1M9mWbK2ifCI=
 github.com/aws/aws-sdk-go-v2/service/sso v1.11.26 h1:ActQgdTNQej/RuUJjB9uxYVLDOvRGtUreXF8L3c8wyg=
