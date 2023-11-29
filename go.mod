@@ -9,7 +9,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.25.8
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.137.3
 	github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2 v1.25.2
-	github.com/aws/aws-sdk-go-v2/service/iam v1.27.4
+	github.com/aws/aws-sdk-go-v2/service/iam v1.27.5
 	github.com/aws/aws-sdk-go-v2/service/rds v1.63.4
 	github.com/aws/smithy-go v1.17.0
 	github.com/cantara/bragi v0.7.4
