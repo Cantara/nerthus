@@ -6,11 +6,11 @@ toolchain go1.21.0
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.24.0
-	github.com/aws/aws-sdk-go-v2/config v1.26.0
-	github.com/aws/aws-sdk-go-v2/service/ec2 v1.140.1
-	github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2 v1.26.4
-	github.com/aws/aws-sdk-go-v2/service/iam v1.28.4
-	github.com/aws/aws-sdk-go-v2/service/rds v1.64.4
+	github.com/aws/aws-sdk-go-v2/config v1.26.1
+	github.com/aws/aws-sdk-go-v2/service/ec2 v1.141.0
+	github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2 v1.26.5
+	github.com/aws/aws-sdk-go-v2/service/iam v1.28.5
+	github.com/aws/aws-sdk-go-v2/service/rds v1.64.5
 	github.com/aws/smithy-go v1.19.0
 	github.com/cantara/bragi v0.7.4
 	github.com/gin-contrib/cors v1.5.0
@@ -19,16 +19,16 @@ require (
 )
 
 require (
-	github.com/aws/aws-sdk-go-v2/credentials v1.16.11 // indirect
+	github.com/aws/aws-sdk-go-v2/credentials v1.16.12 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.14.10 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.2.9 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.5.9 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/ini v1.7.1 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/ini v1.7.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.10.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.10.9 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sso v1.18.4 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.21.4 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sts v1.26.4 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sso v1.18.5 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.21.5 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sts v1.26.5 // indirect
 	github.com/bytedance/sonic v1.10.1 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20230717121745-296ad89f973d // indirect
 	github.com/chenzhuoyu/iasm v0.9.0 // indirect
