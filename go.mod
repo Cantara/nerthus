@@ -7,10 +7,10 @@ toolchain go1.21.0
 require (
 	github.com/aws/aws-sdk-go-v2 v1.24.1
 	github.com/aws/aws-sdk-go-v2/config v1.26.6
-	github.com/aws/aws-sdk-go-v2/service/ec2 v1.145.0
+	github.com/aws/aws-sdk-go-v2/service/ec2 v1.146.0
 	github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2 v1.26.7
 	github.com/aws/aws-sdk-go-v2/service/iam v1.28.7
-	github.com/aws/aws-sdk-go-v2/service/rds v1.68.0
+	github.com/aws/aws-sdk-go-v2/service/rds v1.69.0
 	github.com/aws/smithy-go v1.19.0
 	github.com/cantara/bragi v0.8.0
 	github.com/gin-contrib/cors v1.5.0
