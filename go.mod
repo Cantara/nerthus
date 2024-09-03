@@ -5,12 +5,12 @@ go 1.21
 toolchain go1.23.0
 
 require (
-	github.com/aws/aws-sdk-go-v2 v1.30.4
-	github.com/aws/aws-sdk-go-v2/config v1.27.31
-	github.com/aws/aws-sdk-go-v2/service/ec2 v1.177.0
-	github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2 v1.34.2
-	github.com/aws/aws-sdk-go-v2/service/iam v1.35.0
-	github.com/aws/aws-sdk-go-v2/service/rds v1.82.2
+	github.com/aws/aws-sdk-go-v2 v1.30.5
+	github.com/aws/aws-sdk-go-v2/config v1.27.32
+	github.com/aws/aws-sdk-go-v2/service/ec2 v1.177.1
+	github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2 v1.35.0
+	github.com/aws/aws-sdk-go-v2/service/iam v1.35.1
+	github.com/aws/aws-sdk-go-v2/service/rds v1.82.3
 	github.com/aws/smithy-go v1.20.4
 	github.com/cantara/bragi v0.8.0
 	github.com/gin-contrib/cors v1.7.2
@@ -19,16 +19,16 @@ require (
 )
 
 require (
-	github.com/aws/aws-sdk-go-v2/credentials v1.17.30 // indirect
-	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.16.12 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.3.16 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.6.16 // indirect
+	github.com/aws/aws-sdk-go-v2/credentials v1.17.31 // indirect
+	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.16.13 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.3.17 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.6.17 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/ini v1.8.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.11.4 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.11.18 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sso v1.22.5 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.26.5 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sts v1.30.5 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.11.19 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sso v1.22.6 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.26.6 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sts v1.30.6 // indirect
 	github.com/bytedance/sonic v1.11.6 // indirect
 	github.com/bytedance/sonic/loader v0.1.1 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20230717121745-296ad89f973d // indirect
