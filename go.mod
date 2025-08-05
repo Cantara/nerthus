@@ -11,7 +11,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2 v1.46.1
 	github.com/aws/aws-sdk-go-v2/service/iam v1.43.1
 	github.com/aws/aws-sdk-go-v2/service/rds v1.99.2
-	github.com/aws/smithy-go v1.22.4
+	github.com/aws/smithy-go v1.22.5
 	github.com/cantara/bragi v0.8.0
 	github.com/gin-contrib/cors v1.7.5
 	github.com/gin-gonic/gin v1.10.1
