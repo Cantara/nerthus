@@ -2,7 +2,7 @@ module github.com/cantara/nerthus
 
 go 1.23.0
 
-toolchain go1.24.4
+toolchain go1.24.6
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.37.2
