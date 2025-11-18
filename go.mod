@@ -7,7 +7,7 @@ toolchain go1.25.3
 require (
 	github.com/aws/aws-sdk-go-v2 v1.39.6
 	github.com/aws/aws-sdk-go-v2/config v1.31.20
-	github.com/aws/aws-sdk-go-v2/service/ec2 v1.269.0
+	github.com/aws/aws-sdk-go-v2/service/ec2 v1.270.0
 	github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2 v1.53.0
 	github.com/aws/aws-sdk-go-v2/service/iam v1.50.2
 	github.com/aws/aws-sdk-go-v2/service/rds v1.109.0
