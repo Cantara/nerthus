@@ -1,0 +1,42 @@
+version: "0.14"
+
+entity:
+  name: nerthus
+  type: open-source-library
+  description: >
+    nerthus — Cantara open source library
+
+authority:
+  owner: Cantara — Norwegian Software Development Foundation
+  repo: https://github.com/Cantara/nerthus
+  license: Apache-2.0
+  org_manifest: https://wiki.cantara.no/knowledge.yaml
+
+discovery:
+  provenance: canonical
+  confidence: medium
+  staleness_days: 30
+
+signing:
+  scheme: ed25519
+  scope: this-manifest
+  public_key: https://wiki.cantara.no/.well-known/kcp-signing-key.pub
+
+kcp_version: "0.14"
+project: nerthus
+language: en
+license: "Apache-2.0"
+runtime: Go
+indexing: open
+updated: "2026-05-07"
+  stars: 1
+
+units:
+
+  - id: readme
+    path: README.md
+    intent: "What is nerthus, what does it do, and how do I install and use it?"
+    scope: global
+    audience: [human, agent, developer]
+    validated: "2026-05-07"
+    triggers: [overview, install, usage, nerthus, getting started]
