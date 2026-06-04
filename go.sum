@@ -3470,6 +3470,8 @@ github.com/aws/aws-sdk-go-v2/service/rds v1.118.5 h1:Fz4mbK5H3DTCtmnQLsWRgVlg8yK
 github.com/aws/aws-sdk-go-v2/service/rds v1.118.5/go.mod h1:qz5z/1LvGQ1DyXGm/KAYfxBbTG7eVocSbkpiHVu+Mn4=
 github.com/aws/aws-sdk-go-v2/service/rds v1.118.6 h1:PCHRNddrE/b1IKx5qdKX9dE0OyDo2huHfJJilpDUKHQ=
 github.com/aws/aws-sdk-go-v2/service/rds v1.118.6/go.mod h1:e65cVtBgKsndwx7fCvgWgss9xRbfhWN6DthRKDeu6dI=
+github.com/aws/aws-sdk-go-v2/service/rds v1.119.0 h1:LX5FxHNsK+1bop39sDfPeK1PKzMpCZH7504upjmlEvc=
+github.com/aws/aws-sdk-go-v2/service/rds v1.119.0/go.mod h1:e65cVtBgKsndwx7fCvgWgss9xRbfhWN6DthRKDeu6dI=
 github.com/aws/aws-sdk-go-v2/service/signin v1.0.1 h1:BDgIUYGEo5TkayOWv/oBLPphWwNm/A91AebUjAu5L5g=
 github.com/aws/aws-sdk-go-v2/service/signin v1.0.1/go.mod h1:iS6EPmNeqCsGo+xQmXv0jIMjyYtQfnwg36zl2FwEouk=
 github.com/aws/aws-sdk-go-v2/service/signin v1.0.2 h1:MxMBdKTYBjPQChlJhi4qlEueqB1p1KcbTEa7tD5aqPs=
