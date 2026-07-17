@@ -10,7 +10,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.316.1
 	github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2 v1.57.0
 	github.com/aws/aws-sdk-go-v2/service/iam v1.55.1
-	github.com/aws/aws-sdk-go-v2/service/rds v1.121.0
+	github.com/aws/aws-sdk-go-v2/service/rds v1.122.0
 	github.com/aws/smithy-go v1.27.3
 	github.com/cantara/bragi v0.8.0
 	github.com/gin-contrib/cors v1.7.7
